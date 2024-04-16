@@ -1,0 +1,79 @@
+- name: Deploy Virsh VMs for MAAS
+  hosts: localhost
+  become: true
+  vars_files:
+  - variables.yaml
+
+  tasks:
+    - name: Install apt dependencies
+      apt:
+        pkg:
+          - bridge-utils
+          - cloud-init
+          - libvirt-daemon-system
+          - libvirt-clients
+          - libvirt-dev
+          - pkg-config
+          - qemu-kvm
+          - python3
+          - python3-libvirt
+          - python3-lxml
+
+    - name: Create work directory
+      file:
+        path: "{{ workdir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Download base jammy cloud image
+      get_url:
+        url: https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
+        dest: "{{ workdir }}/ubuntu-jammy-minimal.img"
+        mode: "0644"
+
+    - name: Prepare root disk image
+      shell:
+        cmd: |
+          qemu-img create -f qcow2 -F qcow2 -b ubuntu-jammy-minimal.img disk.img
+          qemu-img resize disk.img +20G
+          qemu-img rebase -f qcow2 -F qcow2 -b ubuntu-jammy-minimal.img disk.img
+        chdir: "{{ workdir }}"
+        creates: disk.img
+
+    - name: Create SSH key pair
+      community.crypto.openssh_keypair:
+        path: "{{ workdir }}/id_rsa"
+      register: maas_ssh_key
+
+    - name: Render cloud-init meta-data
+      template:
+        src: cloud-init/meta-data.yaml.j2
+        dest: "{{ workdir }}/meta-data"
+
+    - name: Render cloud-init user-data
+      template:
+        src: cloud-init/user-data.yaml.j2
+        dest: "{{ workdir }}/user-data"
+      vars:
+        maas_ssh_pubkey: "{{ maas_ssh_key.public_key }}"
+
+    - name: Validate cloud-init user data
+      shell:
+        cmd: |
+          cloud-init schema --config-file user-data
+        chdir: "{{ workdir }}"
+
+    - name: Generate cloud-init config.iso
+      shell:
+        cmd: |
+          genisoimage -o config.iso -V cidata -r -J user-data meta-data
+        chdir: "{{ workdir }}"
+        creates: config.iso
+
+    - name: Deploy Virsh network for MAAS
+      community.libvirt.virt_net:
+        name: maas
+        state: "{{ item }}"
+        autostart: true
+        xml: '{{ lookup("template", "templates/maasbr0.xml.j2") }}'
+      with_items: [present, active]
