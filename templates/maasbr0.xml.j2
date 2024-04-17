@@ -1,3 +1,5 @@
+{% set gateway_addr = maas_cidr | ipaddr("1") | ipaddr("address") -%}
+{% set netmask = maas_cidr | ipaddr("netmask") -%}
 <network>
   <name>maas</name>
   <forward mode='nat'>
@@ -7,9 +9,6 @@
   </forward>
   <bridge name='maasbr0' stp='on' delay='0'/>
   <mac address='52:54:00:80:a9:66'/>
-  <ip
-    address='{{ maas_cidr | ipaddr("1") | ipaddr("address") }}'
-    netmask='{{ maas_cidr | ipaddr("netmask") }}'>
+  <ip address='{{ gateway_addr }}' netmask='{{ netmask }}'>
   </ip>
 </network>
-

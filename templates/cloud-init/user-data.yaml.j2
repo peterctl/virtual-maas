@@ -2,8 +2,10 @@
 hostname: maas-controller
 manage_etc_hosts: true
 chpasswd:
-  list: |
-    ubuntu:ubuntu
+  users:
+    - name: ubuntu
+      password: ubuntu
+      type: text
   expire: false
 users:
   - name: ubuntu
@@ -15,4 +17,4 @@ users:
     ssh_authorized_keys:
       - {{ maas_ssh_pubkey }}
 ssh_pwauth: true
-password: password
+password: ubuntu

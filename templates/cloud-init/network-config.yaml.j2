@@ -1,0 +1,11 @@
+{% set gateway_addr = maas_cidr | ipaddr("1") | ipaddr("address") -%}
+version: 2
+ethernets:
+  enp1s0:
+    dhcp4: no
+    addresses: [{{ maas_cidr | ipaddr("2") }}]
+    routes:
+      - to: default
+        via: {{ gateway_addr }}
+    nameservers:
+      addresses: [{{ gateway_addr }}]
