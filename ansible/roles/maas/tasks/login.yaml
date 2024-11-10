@@ -1,0 +1,17 @@
+- name: Grab MAAS login list
+  shell:
+    cmd: |
+      if maas list | grep -q "{{maas_user}}"; then
+        echo true
+      else
+        echo false
+      fi
+  register: maas_user_logged_in
+
+- set_fact:
+    maas_login_cmd: "maas login {{maas_user}} {{maas_url}} {{maas_apikey}}"
+
+- name: Login as admin user
+  shell:
+    cmd: "{{maas_login_cmd}}"
+  when: maas_user_logged_in.stdout == "false"

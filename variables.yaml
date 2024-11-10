@@ -1,2 +1,23 @@
-maas_cidr: 192.168.255.0/24
-workdir: workdir
+# Name of the environment that will be deployed.
+env_name: vmaas
+
+# Ubuntu series used for the MAAS VMs.
+ubuntu_series: focal
+
+# Virtual networks that will be created in the environment.
+networks:
+  - name: mgmt
+    cidr: 10.10.1.0/24
+    gateway_ip: 10.10.1.1
+    dhcp:
+      start: 10.10.1.150
+      end: 10.10.1.254
+
+# Desired MAAS credentials.
+maas:
+  user: admin
+  password: password
+
+# Juju snap options.
+juju:
+  channel: 2.9/stable

@@ -1,0 +1,27 @@
+- set_fact:
+    juju_channel: "{{ juju_channel | default('latest/stable') }}"
+
+- name: Install Juju
+  become: true
+  snap:
+    name: juju
+    channel: "{{ juju_channel }}"
+    classic: "{{ juju_channel is match('^2') }}"
+
+- name: Create Juju directory
+  file:
+    path: ~/.local/share/juju
+    state: directory
+
+- name: Install Juju cloud
+  template:
+    src: templates/clouds.yaml
+    dest: ~/.local/share/juju/clouds.yaml
+
+- name: Install Juju credential
+  template:
+    src: templates/credentials.yaml
+    dest: ~/.local/share/juju/credentials.yaml
+
+- name: Bootstrap Juju controller
+  shell: juju bootstrap {{ juju_cloud }} {{ juju_cloud }} --bootstrap-series {{ ubuntu_series }}

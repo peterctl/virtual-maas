@@ -1,0 +1,70 @@
+- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
+
+- name: Compute maas_ip if it is not defined
+  when: maas_ip is not defined
+  set_fact:
+    maas_ip: "{{ ansible_default_ipv4.address }}"
+
+- set_fact:
+    maas_url: "http://{{maas_ip}}:5240/MAAS"
+    maas_apikey_path: "{{output_dir}}/{{maas_user}}-apikey.txt"
+
+- name: Create the output directory.
+  file:
+    path: "{{output_dir}}"
+    state: directory
+
+- name: Disable systemd-timesyncd
+  systemd_service:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: false
+
+- name: Install MAAS snaps
+  snap:
+    name:
+      - maas
+      - maas-test-db
+
+- name: Initialize MAAS
+  shell:
+    cmd: |
+      maas init region+rack --maas-url "{{maas_url}}" --database-uri maas-test-db:///
+    creates: /var/snap/maas/common/maas/maas_id
+
+- name: Wait for MAAS to be ready
+  block:
+    - copy:
+        src: files/wait-ready.sh
+        dest: "{{ output_dir }}/wait-ready.sh"
+    - shell:
+        cmd: |
+          bash "{{ output_dir }}/wait-ready.sh" "{{ maas_url }}/api/version/"
+
+- name: Create admin user
+  block:
+    - shell:
+        cmd: |
+          maas createadmin \
+            --username "{{maas_user}}" \
+            --email "{{maas_user}}@maas-server.local" \
+            --password "{{maas_password}}"
+  rescue:
+    - name: Fail if error when creating user
+      fail:
+        msg: "{{ansible_failed_result.stderr}}"
+      when: "'AlreadyExistingUser' not in ansible_failed_result.stderr"
+
+- name: Create a new admin API key
+  shell:
+    cmd: |
+      maas apikey --generate --username "{{maas_user}}"
+  register: maas_apikey_out
+
+- set_fact:
+    maas_apikey: "{{ maas_apikey_out.stdout | trim }}"
+
+- name: Store the admin API key on a file
+  copy:
+    dest: "{{ maas_apikey_path }}"
+    content: "{{ maas_apikey }}"

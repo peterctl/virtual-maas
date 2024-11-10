@@ -1,0 +1,38 @@
+- name: Get or create boot source selection
+  block:
+    - shell: |
+        get_bss=$(
+          maas {{ maas.user }} boot-source-selections read 1 |
+            jq -r --arg release {{ ubuntu_series }} '
+                .[] | select(
+                  .os=="ubuntu" and
+                  .release==$release and
+                  (.arches[] | contains("amd64"))
+                )
+              '
+        )
+        # Fail if not found
+        [ "$get_bss" = "" ] && exit 1
+        echo "$get_bss"
+      register: bss_cmd
+  rescue:
+    - shell: |
+        maas {{ maas.user }} boot-source-selections create 1 \
+          os=ubuntu \
+          release={{ ubuntu_series }} \
+          arches=amd64 \
+          subarches='*' \
+          labels='*'
+      register: bss_cmd
+- set_fact:
+    bss: "{{ bss_cmd.stdout | from_json }}"
+
+- name: Import boot resources
+  shell: |
+    is_importing() {
+      maas {{ maas.user }} boot-resources is-importing
+    }
+    maas {{ maas.user }} boot-resources import
+    while $(is_importing); do
+      sleep 3
+    done
