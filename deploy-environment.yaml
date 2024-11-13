@@ -59,9 +59,12 @@
 - name: Configure the Ubuntu images on MAAS
   hosts: localhost
   tasks:
-    - import_role:
+    - include_role:
         name: ansible/roles/maas
         tasks_from: configure-boot-source-selections.yaml
+      vars:
+        release: "{{ item }}"
+      with_items: "{{ ubuntu_series }}"
 
 - name: Configure the MAAS cloud in Juju
   hosts: localhost
