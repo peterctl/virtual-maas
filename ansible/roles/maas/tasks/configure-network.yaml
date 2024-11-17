@@ -1,0 +1,73 @@
+- name: Install jq
+  become: true
+  apt:
+    name: jq
+
+- name: Get primary rack
+  shell: maas {{ maas.user }} rack-controllers read | jq -r '.[0]'
+  register: primary_rack_cmd
+- set_fact:
+    primary_rack: "{{ primary_rack_cmd.stdout | from_json }}"
+
+- name: Get or create space
+  block:
+    - shell: maas {{ maas.user }} space read {{ network.name }}
+      register: space_cmd
+  rescue:
+    - shell: maas {{ maas.user }} spaces create name={{ network.name }}
+      register: space_cmd
+- set_fact:
+    space: "{{ space_cmd.stdout | from_json }}"
+
+- name: Get subnet
+  shell: maas {{ maas.user }} subnet read {{ network.cidr }}
+  register: subnet_cmd
+- set_fact:
+    subnet: "{{ subnet_cmd.stdout | from_json }}"
+
+- name: Update subnet gateway_ip
+  shell: |
+    maas {{ maas.user }} subnet update {{ subnet.id }} \
+      gateway_ip={{ network.gateway_ip }}
+  when: network.gateway_ip != subnet.gateway_ip
+
+- name: Get or create IP range
+  block:
+    - shell: |
+        get_iprange=$(
+          maas {{ maas.user }} ipranges read |
+            jq -r \
+              --arg cidr {{ network.cidr }} \
+              --arg start_ip {{ network.dhcp.start }} \
+              --arg end_ip {{ network.dhcp.end }} \
+              '
+                .[] | select(
+                  .subnet.cidr==$cidr and .start_ip==$start_ip and .end_ip==$end_ip
+                )
+              '
+        )
+        # Fail if not found
+        [ "$get_iprange" = "" ] && exit 1
+        echo "$get_iprange"
+      register: iprange_cmd
+  rescue:
+    - shell: |
+        maas {{ maas.user }} ipranges create \
+          type=dynamic \
+          subnet={{ subnet.id }} \
+          start_ip={{ network.dhcp.start }} \
+          end_ip={{ network.dhcp.end }}
+      register: iprange_cmd
+- set_fact:
+    iprange: "{{ iprange_cmd.stdout | from_json }}"
+
+- name: Configure the MAAS vlan
+  shell: |
+    maas admin vlan update {{ subnet.vlan.fabric_id }} {{ subnet.vlan.vid }} \
+      dhcp_on=True \
+      primary_rack={{ primary_rack.system_id }} \
+      space={{ space.id }}
+  when: >
+    subnet.vlan.primary_rack != primary_rack.system_id or
+    subnet.vlan.space != space.name or
+    subnet.vlan.dhcp_on != True

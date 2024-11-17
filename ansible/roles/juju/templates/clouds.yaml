@@ -1,0 +1,5 @@
+clouds:
+  "{{ juju_cloud }}":
+    type: maas
+    auth-types: [oauth1]
+    endpoint: "{{ maas_url }}"

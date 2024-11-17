@@ -1,0 +1,43 @@
+- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
+
+- name: Create private key
+  community.crypto.openssl_privatekey:
+    path: "{{ output_dir }}/{{ maas_user }}.key"
+    return_content: true
+  register: privatekey
+
+- name: Create certificate
+  community.crypto.x509_certificate:
+    path: "{{ output_dir }}/{{ maas_user }}.crt"
+    privatekey_path: "{{ privatekey.filename }}"
+    provider: selfsigned
+    return_content: true
+  register: certificate
+
+- name: Add the certificate to the LXD trust
+  block:
+    - shell:
+        cmd: |
+          lxc config trust add {{ certificate.filename }}
+  rescue:
+    - name: Fail if error when adding cert to LXD trust
+      fail:
+        msg: "{{ ansible_failed_result.stderr }}"
+      when: "'Certificate already in trust store' not in ansible_failed_result.stderr"
+
+- name: Register the LXD VM host in MAAS
+  block:
+    - shell:
+        cmd: |
+          maas admin vm-hosts create \
+            name=hypervisor \
+            type=lxd \
+            project=default \
+            power_address={{ lxd_address }} \
+            key="{{ privatekey.privatekey }}" \
+            certificate="{{ certificate.certificate }}"
+  rescue:
+    - name: Fail if error when creating MAAS VM host
+      fail:
+        msg: "{{ ansible_failed_result.stderr }}"
+      when: "'Pod hypervisor with type and parameters already exist' not in ansible_failed_result.stdout"

@@ -1,0 +1,5 @@
+- name: Install and initialize MAAS.
+  import_tasks: install-init.yaml
+
+- name: Login to MAAS.
+  import_tasks: login.yaml

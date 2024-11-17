@@ -1,0 +1,76 @@
+- name: Create output directory on all hosts
+  hosts: all
+  tasks:
+    - import_tasks: ansible/tasks/output_dir.yaml
+
+- name: Install and configure LXD on the host.
+  hosts: hypervisor
+  become: true
+  roles:
+    - role: ansible/roles/lxd
+
+- name: Deploy MAAS server
+  hosts: hypervisor
+  become: true
+  roles:
+    - role: ansible/roles/maas
+      vars:
+        maas_user: "{{ maas.user }}"
+        maas_password: "{{ maas.password }}"
+
+- name: Add MAAS client to localhost
+  hosts: localhost
+  tasks:
+    - name: Install MAAS snap
+      snap:
+        name: maas
+      become: true
+
+    - name: Login to MAAS
+      import_role:
+        name: ansible/roles/maas
+        tasks_from: login.yaml
+      vars:
+        maas_user: "{{ maas.user }}"
+        maas_url: "{{hostvars[groups.hypervisor[0]]['maas_url']}}"
+        maas_apikey: "{{hostvars[groups.hypervisor[0]]['maas_apikey']}}"
+
+- name: Register LXD VM host on MAAS
+  hosts: hypervisor
+  tasks:
+    - import_role:
+        name: ansible/roles/maas
+        tasks_from: add-lxd-vm-host.yaml
+      vars:
+        maas_user: "{{ maas.user }}"
+        lxd_address: "{{ maas_ip }}:8443"
+
+- name: Configure the networks in MAAS
+  hosts: localhost
+  tasks:
+    - name: "Configure network '{{ item.name }}' on MAAS"
+      include_role:
+        name: ansible/roles/maas
+        tasks_from: configure-network.yaml
+      vars:
+        network: "{{ item }}"
+      with_items: "{{ networks }}"
+
+- name: Configure the Ubuntu images on MAAS
+  hosts: localhost
+  tasks:
+    - import_role:
+        name: ansible/roles/maas
+        tasks_from: configure-boot-source-selections.yaml
+
+- name: Configure the MAAS cloud in Juju
+  hosts: localhost
+  tasks:
+    - import_role:
+        name: ansible/roles/juju
+      vars:
+        maas_user: "{{ maas.user }}"
+        maas_apikey: "{{ maas_apikey }}"
+        maas_url: "{{ maas_url }}"
+        juju_cloud: "{{ env_name }}"
+        juju_channel: "2.9/stable"
