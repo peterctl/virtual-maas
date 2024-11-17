@@ -1,11 +1,18 @@
+- set_fact:
+    release: "{{ release }}"
+    os: "{{ os | default('ubuntu') }}"
+
 - name: Get or create boot source selection
   block:
     - shell: |
         get_bss=$(
           maas {{ maas.user }} boot-source-selections read 1 |
-            jq -r --arg release {{ ubuntu_series }} '
+            jq -r \
+              --arg release {{ release }} \
+              --arg os {{ os }} \
+              '
                 .[] | select(
-                  .os=="ubuntu" and
+                  .os==$os and
                   .release==$release and
                   (.arches[] | contains("amd64"))
                 )
@@ -18,8 +25,8 @@
   rescue:
     - shell: |
         maas {{ maas.user }} boot-source-selections create 1 \
-          os=ubuntu \
-          release={{ ubuntu_series }} \
+          os={{ os }} \
+          release={{ release }} \
           arches=amd64 \
           subarches='*' \
           labels='*'

@@ -1,0 +1,32 @@
+- block:
+    - shell: |
+        get_iprange=$(
+          maas {{ maas.user }} ipranges read |
+            jq -r \
+              --argjson subnet_id {{ subnet_id }} \
+              --arg type {{ iprange_type }} \
+              --arg start_ip {{ iprange_start }} \
+              --arg end_ip {{ iprange_end }} \
+              '
+                .[] | select(
+                  .subnet.id==$subnet_id and
+                  .type==$type and
+                  .start_ip==$start_ip and
+                  .end_ip==$end_ip
+                )
+              '
+        )
+        # Fail if not found
+        [ "$get_iprange" = "" ] && exit 1
+        echo "$get_iprange"
+      register: iprange_cmd
+  rescue:
+    - shell: |
+        maas {{ maas.user }} ipranges create \
+          subnet={{ subnet_id }} \
+          type={{ iprange_type }} \
+          start_ip={{ iprange_start }} \
+          end_ip={{ iprange_end }}
+      register: iprange_cmd
+- set_fact:
+    iprange: "{{ iprange_cmd.stdout | from_json }}"
