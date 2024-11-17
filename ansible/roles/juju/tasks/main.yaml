@@ -29,6 +29,8 @@
       {% if bootstrap_series is defined %}--bootstrap-series {{ bootstrap_series }}{% endif %}
   register: bootstrap_cmd
   changed_when: |
-    'ERROR controller "{{ juju_cloud }}" already exists' not in bootstrap_cmd.stderr
+    already_exists_msg not in bootstrap_cmd.stderr and bootstrap_cmd.rc == 0
   failed_when: |
-    'ERROR controller "{{ juju_cloud }}" already exists' not in bootstrap_cmd.stderr
+    already_exists_msg not in bootstrap_cmd.stderr and bootstrap_cmd.rc != 0
+  vars:
+    already_exists_msg: 'ERROR controller "{{ juju_cloud }}" already exists'

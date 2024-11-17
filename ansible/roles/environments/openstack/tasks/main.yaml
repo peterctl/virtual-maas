@@ -1,0 +1,142 @@
+- name: Deploy the VMs
+  terraform:
+    project_path: "{{ playbook_dir }}/terraform/maas-machines"
+    force_init: true
+    complex_vars: true
+    variables:
+      maas_api_url: "{{ maas_api_url }}"
+      maas_api_key: "{{ maas_api_key }}"
+      maas_vm_host_id: "{{ maas_vm_host_id }}"
+      vm_count: "{{ vm_count }}"
+      vm_hostname_prefix: "{{ vm_hostname_prefix }}"
+      vm_networks: "{{ vm_networks }}"
+      vm_tags: "{{ vm_tags }}"
+
+- name: Clone the stsstack-bundles repo
+  git:
+    repo: https://github.com/canonical/stsstack-bundles.git
+    dest: "{{ output_dir }}/stsstack-bundles"
+
+- name: Install the OpenStack clients
+  apt:
+    pkg:
+      - python3-openstackclient
+      - python3-keystoneclient
+      - python3-neutronclient
+
+- name: Generate the OpenStack bundle
+  shell:
+    cmd: |
+      ./generate-bundle.sh \
+        --name openstack \
+        --default-binding mgmt \
+        --model-constraints tags=openstack \
+        --hyperconverged \
+        --ha \
+        --vault-ha \
+        --num-compute {{ vm_count }} \
+        --vip-addr-start {{ vip_addr_start }}
+    chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+  vars:
+    vip_addr_start: "{{ vm_networks[0].reserved_ranges[0].start }}"
+
+- name: Amend the generated bundle
+  shell:
+    cmd: |
+      # Remove the `storage` definition under nova-compute.
+      yq -i 'del(.applications[].storage)' b/openstack/openstack.yaml
+    chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+
+- name: Deploy the bundle
+  shell:
+    cmd: source b/openstack/command
+    chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+    executable: /bin/bash
+
+- name: Wait for Vault to be ready to initialize
+  shell:
+    cmd: |
+      while true; do
+        status=$(juju status --format json)
+        all_units=$(
+          echo "$status" |
+            jq -r '.applications.vault.units | keys[]' |
+            wc -l
+        )
+        ready_units=$(
+          echo "$status" |
+            jq -r '
+                .applications.vault.units | to_entries[] |
+                  select(
+                    .value["workload-status"].current == "blocked" and
+                    .value["workload-status"].message == "Vault needs to be initialized" and
+                    .value["juju-status"].current == "idle"
+                  ) |
+                  .key
+              ' |
+            wc -l
+        )
+        if [[ "$all_units" == "$ready_units" ]]; then
+          break
+        fi
+        sleep 5
+      done
+    executable: /bin/bash
+
+- name: Initialize Vault
+  shell:
+    cmd: ./tools/vault-unseal-and-authorise.sh
+    chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+    executable: /bin/bash
+
+- name: Wait for Keystone to be ready
+  shell:
+    cmd: |
+      while true; do
+        status=$(juju status --format json)
+        all_units=$(
+          echo "$status" |
+            jq -r '.applications.keystone.units | keys[]' |
+            wc -l
+        )
+        ready_units=$(
+          echo "$status" |
+            jq -r '
+                .applications.keystone.units | to_entries[] |
+                  select(
+                    .value["workload-status"].current=="active" and
+                    .value["juju-status"].current == "idle"
+                  ) |
+                  .key
+              ' |
+            wc -l
+        )
+        if [[ "$all_units" == "$ready_units" ]]; then
+          break
+        fi
+        sleep 5
+      done
+    chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+    executable: /bin/bash
+
+- name: Configure the deployed environment
+  shell:
+    cmd: |
+      source novarc
+      ./configure metal
+    chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+    executable: /bin/bash
+
+- name: Collect the OpenStack novarc credentials
+  shell:
+    cmd: |
+      source novarc
+      env | grep '^OS_' | sed 's/^/export /'
+    chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+    executable: /bin/bash
+    register: novarc_cmd
+
+- name: Save the OpenStack novarc credentials
+  copy:
+    dest: "{{ output_dir }}/novarc"
+    content: "{{ novarc_cmd }}/novarc"

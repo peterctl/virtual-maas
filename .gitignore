@@ -1,1 +1,6 @@
+# Output directory
 out/
+
+# Terraform
+.terraform*
+*.tfstate*

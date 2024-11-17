@@ -42,6 +42,7 @@
         name: ansible/roles/maas
         tasks_from: add-lxd-vm-host.yaml
       vars:
+        name: hypervisor
         maas_user: "{{ maas.user }}"
         lxd_address: "{{ maas_ip }}:8443"
 
@@ -77,3 +78,17 @@
         maas_url: "{{ maas_url }}"
         juju_cloud: "{{ env_name }}"
         juju_channel: "2.9/stable"
+
+- name: Deploy OpenStack
+  hosts: localhost
+  roles:
+    - role: ansible/roles/environments/openstack
+      vars:
+        maas_api_url: "{{ maas_url }}"
+        maas_api_key: "{{ maas_apikey }}"
+        maas_vm_host_id: "{{ vmhost.id }}"
+        vm_count: 3
+        vm_hostname_prefix: "{{ env_name }}"
+        vm_networks: "{{ networks }}"
+        vm_tags:
+          - openstack

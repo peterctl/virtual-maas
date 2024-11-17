@@ -12,11 +12,15 @@ networks:
     cidr: 10.1.0.0/24
     gateway_ip: 10.1.0.1
     dhcp:
-      start: 10.1.0.150
-      end: 10.1.0.254
+      start: 10.1.0.100
+      end: 10.1.0.149
     reserved_ranges:
-      - start: 10.1.0.100
-        end: 10.1.0.149
+      # VIP addresses
+      - start: 10.1.0.150
+        end: 10.1.0.199
+      # OpenStack floating IPs
+      - start: 10.1.0.200
+        end: 10.1.0.254
 
 # Desired MAAS credentials.
 maas:

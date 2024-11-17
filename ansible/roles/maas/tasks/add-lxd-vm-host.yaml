@@ -1,5 +1,10 @@
 - import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
 
+- set_fact:
+    name: "{{ name | default(env_name) }}"
+    type: lxd
+    project: default
+
 - name: Create private key
   community.crypto.openssl_privatekey:
     path: "{{ output_dir }}/{{ maas_user }}.key"
@@ -27,17 +32,34 @@
 
 - name: Register the LXD VM host in MAAS
   block:
-    - shell:
-        cmd: |
-          maas admin vm-hosts create \
-            name=hypervisor \
-            type=lxd \
-            project=default \
-            power_address={{ lxd_address }} \
-            key="{{ privatekey.privatekey }}" \
-            certificate="{{ certificate.certificate }}"
+    - shell: |
+        vmhost_ids=$(
+          maas {{ maas_user }} vm-hosts read |
+            jq -r --arg type {{ type }} --arg name {{ name }} '
+                .[] | select(.type==$type and .name==$name) | .id
+              '
+        )
+        for id in $vmhost_ids; do
+          address_is_correct=$(
+            maas {{ maas_user }} vm-host parameters $id |
+              jq -r --arg power_address {{ lxd_address }} '.power_address==$power_address'
+          )
+          if $address_is_correct; then
+            maas {{ maas.user }} vm-host read $id
+            exit 0
+          fi
+        done
+        exit 1
+      register: vmhost_cmd
   rescue:
-    - name: Fail if error when creating MAAS VM host
-      fail:
-        msg: "{{ ansible_failed_result.stderr }}"
-      when: "'Pod hypervisor with type and parameters already exist' not in ansible_failed_result.stdout"
+    - shell: |
+        maas {{ maas_user }} vm-hosts create \
+          name={{ name }} \
+          type={{ type }} \
+          project={{ project }} \
+          power_address={{ lxd_address }} \
+          key="{{ privatekey.privatekey }}" \
+          certificate="{{ certificate.certificate }}"
+      register: vmhost_cmd
+- set_fact:
+    vmhost: "{{ vmhost_cmd.stdout | from_json }}"

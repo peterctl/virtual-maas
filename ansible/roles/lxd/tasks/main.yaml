@@ -4,7 +4,7 @@
     net_item:
       name: "{{ item.name }}"
       config:
-        ipv4.address: "{{ item.gateway_ip }}/{{ item.cidr | ipaddr('prefix') }}"
+        ipv4.address: "{{ item.gateway_ip }}/{{ item.cidr | ansible.utils.ipaddr('prefix') }}"
         ipv4.dhcp: false
         ipv4.nat: true
         ipv6.address: none
