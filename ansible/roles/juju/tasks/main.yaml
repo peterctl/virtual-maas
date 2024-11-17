@@ -24,4 +24,11 @@
     dest: ~/.local/share/juju/credentials.yaml
 
 - name: Bootstrap Juju controller
-  shell: juju bootstrap {{ juju_cloud }} {{ juju_cloud }}{% if bootstrap_series is defined %} --bootstrap-series {{ bootstrap_series }}{% endif %}
+  shell: |
+    juju bootstrap {{ juju_cloud }} {{ juju_cloud }} \
+      {% if bootstrap_series is defined %}--bootstrap-series {{ bootstrap_series }}{% endif %}
+  register: bootstrap_cmd
+  changed_when: |
+    'ERROR controller "{{ juju_cloud }}" already exists' not in bootstrap_cmd.stderr
+  failed_when: |
+    'ERROR controller "{{ juju_cloud }}" already exists' not in bootstrap_cmd.stderr
