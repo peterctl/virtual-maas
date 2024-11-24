@@ -6,6 +6,50 @@ ubuntu_series:
   - focal
   - jammy
 
+# Virtual machines that will be created in the environment.
+machines:
+  # For the OpenStack model
+  - name: openstack-1
+    cores: 4
+    memory_mb: 16384
+    networks:
+      - mgmt
+      - data
+    disks:
+      - size_gb: 100  # Root disk
+      - size_gb: 20   # Ceph OSD
+    tags: [ openstack ]
+  - name: openstack-2
+    cores: 4
+    memory_mb: 16384
+    networks:
+      - mgmt
+      - data
+    disks:
+      - size_gb: 100  # Root disk
+      - size_gb: 20   # Ceph OSD
+    tags: [ openstack ]
+  - name: openstack-3
+    cores: 4
+    memory_mb: 16384
+    networks:
+      - mgmt
+      - data
+    disks:
+      - size_gb: 100  # Root disk
+      - size_gb: 20   # Ceph OSD
+    tags: [ openstack ]
+
+  # For the Landscape model
+  - name: landscape
+    cores: 2
+    memory_mb: 8192
+    networks:
+      - mgmt
+    disks:
+      - size_gb: 100  # Root disk
+    tags: [ landscape ]
+
 # Virtual networks that will be created in the environment.
 networks:
   - name: mgmt
@@ -21,6 +65,12 @@ networks:
       # OpenStack floating IPs
       - start: 10.1.0.200
         end: 10.1.0.254
+  - name: data
+    cidr: 10.2.0.0/24
+    gateway_ip: 10.2.0.1
+    dhcp:
+      start: 10.2.0.100
+      end: 10.2.0.149
 
 # Desired MAAS credentials.
 maas:

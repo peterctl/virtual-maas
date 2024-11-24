@@ -10,22 +10,22 @@ variable "maas_vm_host_id" {
   type = string
 }
 
-variable "vm_count" {
-  type = number
-}
-
-variable "vm_hostname_prefix" {
-  type = string
-}
-
-variable "vm_networks" {
+variable "machines" {
   type = list(object({
     name = string
-    cidr = string
-    gateway_ip = string
+    cores = number
+    memory_mb = number
+    networks = list(string)
+    tags = optional(list(string))
+    disks = optional(list(object({
+      size_gb = number
+    })))
   }))
 }
 
-variable "vm_tags" {
-  type = list(string)
+variable "networks" {
+  type = list(object({
+    name = string
+    cidr = string
+  }))
 }

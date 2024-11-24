@@ -39,6 +39,11 @@
     iprange_type: dynamic
     iprange_start: "{{ network.dhcp.start }}"
     iprange_end: "{{ network.dhcp.end }}"
+  when: network.dhcp is defined and network.dhcp not in [false, none]
+
+- name: DEBUG item
+  debug:
+    var: item
 
 - name: Get or create reserved IP ranges
   include_tasks:
@@ -48,7 +53,7 @@
     iprange_type: reserved
     iprange_start: "{{ item.start }}"
     iprange_end: "{{ item.end }}"
-  with_items: "{{ network.reserved_ranges }}"
+  with_items: "{{ network.reserved_ranges | default([]) }}"
 
 - name: Configure the MAAS vlan
   shell: |

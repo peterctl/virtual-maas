@@ -1,0 +1,115 @@
+- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
+
+- name: Create private key
+  community.crypto.openssl_privatekey:
+    path: "{{ output_dir }}/landscape.key"
+    return_content: true
+  register: privatekey
+
+- name: Create certificate
+  community.crypto.x509_certificate:
+    path: "{{ output_dir }}/landscape.crt"
+    privatekey_path: "{{ privatekey.filename }}"
+    provider: selfsigned
+    return_content: true
+  register: certificate
+
+- name: Create Juju model for Landscape
+  shell: |
+    juju add-model {{ juju_model }} {{ juju_cloud }} --config default-series={{ model_series }}
+  register: add_model_cmd
+  changed_when: "add_model_cmd.rc == 0 and 'already exists' not in add_model_cmd.stderr"
+  failed_when: "add_model_cmd.rc != 0 and 'already exists' not in add_model_cmd.stderr"
+
+- name: Generate the bundle
+  template:
+    src: templates/landscape-bundle.yaml
+    dest: "{{ output_dir }}/landscape-bundle.yaml"
+  vars:
+    ssl_key: "{{ privatekey.privatekey | b64encode }}"
+    ssl_cert: "{{ certificate.certificate | b64encode }}"
+  register: bundle_template
+
+- name: Deploy the bundle
+  shell:
+    cmd: |
+      juju deploy -m {{ juju_model }} ./landscape-bundle.yaml --map-machines=existing
+    chdir: "{{ output_dir }}"
+  environment:
+    JUJU_MODEL: "{{ juju_model }}"
+
+- name: Wait for Landscape to be ready
+  shell: |
+    juju wait-for model {{ juju_model }}
+  environment:
+    JUJU_MODEL: "{{ juju_model }}"
+
+- name: Find the HAProxy and PostgreSQL IPs
+  shell: |
+    juju status --format json | jq -r '
+        . as $root |
+        ( $root.applications.haproxy.units[] | select(.leader)."public-address" ) as $haproxy_ip |
+        ( $root.applications.postgresql.units[] | select(.leader)."public-address" ) as $psql_ip |
+        { haproxy_ip: $haproxy_ip, psql_ip: $psql_ip }
+      '
+  environment:
+    JUJU_MODEL: "{{ juju_model }}"
+  register: ips_cmd
+
+- name: Find the PostgreSQL operator password
+  shell: |
+    juju run-action --wait postgresql/leader get-password username=operator |
+      yq -r '.[].results.password'
+  environment:
+    JUJU_MODEL: "{{ juju_model }}"
+  register: operator_pass_cmd
+
+- set_fact:
+    ips: "{{ ips_cmd.stdout | from_json }}"
+    operator_pass: "{{ operator_pass_cmd.stdout }}"
+
+- set_fact:
+    haproxy_url: "https://{{ ips.haproxy_ip }}"
+    psql_uri: "postgresql://operator:{{ operator_pass }}@{{ ips.psql_ip }}:5432"
+
+- name: Bootstrap the Landscape account
+  shell: |
+    juju exec --unit landscape-server/leader -- \
+      sudo /opt/canonical/landscape/bootstrap-account \
+        --root_url https://{{ ips.haproxy_ip }}/ \
+        --admin_name {{ admin_user }} \
+        --admin_email {{ admin_user }}@landscape \
+        --admin_password {{ admin_password }}
+  environment:
+    JUJU_MODEL: "{{ juju_model }}"
+  register: account_cmd
+  changed_when: |
+    "Account 'standalone' already exists" not in account_cmd.stderr and account_cmd.rc == 0
+  failed_when: |
+    "Account 'standalone' already exists" not in account_cmd.stderr and account_cmd.rc != 0
+
+- name: Find the Landscape API key and secret
+  shell:
+    python {{ playbook_dir }}/scripts/landscape_get_api_credentials.py {{ psql_uri }}
+  environment:
+    JUJU_MODEL: "{{ juju_model }}"
+  register: landscape_api_credentials_cmd
+
+- set_fact:
+    landscape_api_credentials: "{{ landscape_api_credentials_cmd.stdout | from_json }}"
+
+- set_fact:
+    landscape_api:
+      uri: "{{ haproxy_url }}"
+      key: "{{ landscape_api_credentials.access_key_id }}"
+      secret: "{{ landscape_api_credentials.access_secret_key }}"
+      ssl_ca_file: "{{ certificate.filename }}"
+
+- name: Generate Landscape environment variables
+  copy:
+    dest: "{{ output_dir }}/landscaperc"
+    content: |
+      export LANDSCAPE_API_URI="{{ landscape_api.uri }}"
+      export LANDSCAPE_API_KEY="{{ landscape_api.key }}"
+      export LANDSCAPE_API_SECRET="{{ landscape_api.secret }}"
+      export LANDSCAPE_API_SSL_CA_FILE="{{ landscape_api.ssl_ca_file }}"

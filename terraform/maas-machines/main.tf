@@ -1,35 +1,49 @@
-resource "maas_vm_host_machine" "vms" {
-  count = var.vm_count
+locals {
+  machine_map = { for machine in var.machines : machine.name => machine }
+  network_cidrs = { for network in var.networks : network.name => network.cidr }
+}
+
+resource "maas_vm_host_machine" "machines" {
+  for_each = local.machine_map
 
   vm_host = var.maas_vm_host_id
 
-  hostname = "${var.vm_hostname_prefix}-${count.index}"
-  cores = 4
-  memory = 16384
+  hostname = each.key
+  cores    = each.value.cores
+  memory   = each.value.memory_mb
 
   dynamic "network_interfaces" {
-    for_each = var.vm_networks
-
+    for_each = toset(each.value.networks)
     content {
-      name = "eth_${network_interfaces.value.name}"
-      subnet_cidr = network_interfaces.value.cidr
+      name        = network_interfaces.key
+      subnet_cidr = local.network_cidrs[network_interfaces.key]
     }
   }
 
-  # For the root disk
-  storage_disks {
-    size_gigabytes = 100
-  }
-
-  # For Ceph OSDs
-  storage_disks {
-    size_gigabytes = 30
+  dynamic "storage_disks" {
+    for_each = { for i, disk in each.value.disks : i => disk }
+    content {
+      size_gigabytes = storage_disks.value.size_gb
+    }
   }
 }
 
-resource "maas_tag" "tags" {
-  for_each = toset(var.vm_tags)
+locals {
+  all_tags     = distinct(flatten([for machine in var.machines : machine.tags]))
+  tag_map = zipmap(
+    local.all_tags,
+    [
+      for tag in local.all_tags : [
+        for key, machine in local.machine_map :
+        maas_vm_host_machine.machines[key].id if contains(machine.tags, tag)
+      ]
+    ]
+  )
+}
 
-  name = each.key
-  machines = [ for vm in maas_vm_host_machine.vms : vm.id ]
+resource "maas_tag" "tags" {
+  for_each = local.tag_map
+
+  name     = each.key
+  machines = each.value
 }

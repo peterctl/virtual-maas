@@ -1,0 +1,43 @@
+series: {{ model_series }}
+
+machines:
+  "0":
+    constraints: tags=landscape
+
+applications:
+  landscape-server:
+    charm: landscape-server
+    channel: latest/stable
+    num_units: 1
+    to:
+      - "lxd:0"
+  postgresql:
+    charm: postgresql
+    channel: 14/stable
+    num_units: 1
+    to:
+      - "0"
+    storage:
+      pgdata: rootfs,1,1024M
+  rabbitmq-server:
+    charm: rabbitmq-server
+    channel: 3.9/stable
+    num_units: 1
+    to:
+      - "lxd:0"
+  haproxy:
+    charm: haproxy
+    channel: latest/edge
+    num_units: 1
+    to:
+      - "lxd:0"
+    options:
+      ssl_key: "{{ ssl_key }}"
+      ssl_cert: "{{ ssl_cert }}"
+      services: ""
+
+relations:
+  - [ landscape-server:db, postgresql:db-admin ]
+  - [ landscape-server:amqp, rabbitmq-server:amqp ]
+  - [ landscape-server:website, haproxy:reverseproxy ]
+

@@ -87,8 +87,14 @@
         maas_api_url: "{{ maas_url }}"
         maas_api_key: "{{ maas_apikey }}"
         maas_vm_host_id: "{{ vmhost.id }}"
-        vm_count: 3
-        vm_hostname_prefix: "{{ env_name }}"
-        vm_networks: "{{ networks }}"
-        vm_tags:
-          - openstack
+        machines: "{{ vms }}"
+
+- name: Deploy Landscape
+  hosts: localhost
+  roles:
+    - role: ansible/roles/environments/landscape
+      vars:
+        model_series: jammy
+        juju_cloud: "{{ env_name }}"
+        admin_user: admin
+        admin_password: password

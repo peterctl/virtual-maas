@@ -7,10 +7,8 @@
       maas_api_url: "{{ maas_api_url }}"
       maas_api_key: "{{ maas_api_key }}"
       maas_vm_host_id: "{{ maas_vm_host_id }}"
-      vm_count: "{{ vm_count }}"
-      vm_hostname_prefix: "{{ vm_hostname_prefix }}"
-      vm_networks: "{{ vm_networks }}"
-      vm_tags: "{{ vm_tags }}"
+      machines: "{{ machines }}"
+      networks: "{{ networks }}"
 
 - name: Clone the stsstack-bundles repo
   git:
@@ -38,7 +36,7 @@
         --vip-addr-start {{ vip_addr_start }}
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
   vars:
-    vip_addr_start: "{{ vm_networks[0].reserved_ranges[0].start }}"
+    vip_addr_start: "{{ networks[0].reserved_ranges[0].start }}"
 
 - name: Amend the generated bundle
   shell:
@@ -63,7 +61,7 @@
             jq -r '.applications.vault.units | keys[]' |
             wc -l
         )
-        ready_units=$(
+        blocked_units=$(
           echo "$status" |
             jq -r '
                 .applications.vault.units | to_entries[] |
@@ -76,33 +74,68 @@
               ' |
             wc -l
         )
-        if [[ "$all_units" == "$ready_units" ]]; then
+        if [[ "$all_units" == "$blocked_units" ]]; then
+          echo ready_to_init
+          break
+        fi
+        ready_units=$(
+          echo "$status" |
+            jq -r '
+                .applications.vault.units | to_entries[] |
+                  select(
+                    .value["workload-status"].current == "active" and
+                    (.value["workload-status"].message | startswith("Unit is ready")) and
+                    .value["juju-status"].current == "idle"
+                  ) |
+                  .key
+              ' |
+            wc -l
+        )
+        sealed_units=$(
+          echo "$status" |
+            jq -r '
+                .applications.vault.units | to_entries[] |
+                  select(
+                    .value["workload-status"].current == "blocked" and
+                    .value["workload-status"].message == "Unit is sealed" and
+                    .value["juju-status"].current == "idle"
+                  ) |
+                  .key
+              ' |
+            wc -l
+        )
+        if [[ "$all_units" == "$(($ready_units + $sealed_units))" ]]; then
+          echo skip_init
           break
         fi
         sleep 5
       done
     executable: /bin/bash
+  register: vault_waitready
 
 - name: Initialize Vault
   shell:
     cmd: ./tools/vault-unseal-and-authorise.sh
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
+  when: "'ready_to_init' in vault_waitready.stdout"
 
-- name: Wait for Keystone to be ready
+- name: Wait for the OpenStack API to be ready
   shell:
     cmd: |
       while true; do
         status=$(juju status --format json)
         all_units=$(
           echo "$status" |
-            jq -r '.applications.keystone.units | keys[]' |
+            jq -r --arg app {{ item }} '
+                .applications[$app].units | keys[]
+              ' |
             wc -l
         )
         ready_units=$(
           echo "$status" |
-            jq -r '
-                .applications.keystone.units | to_entries[] |
+            jq -r --arg app {{ item }} '
+                .applications[$app].units | to_entries[] |
                   select(
                     .value["workload-status"].current=="active" and
                     .value["juju-status"].current == "idle"
@@ -118,6 +151,9 @@
       done
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
+  with_items:
+    - keystone
+    - keystone-hacluster
 
 - name: Configure the deployed environment
   shell:
@@ -134,9 +170,9 @@
       env | grep '^OS_' | sed 's/^/export /'
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
-    register: novarc_cmd
+  register: novarc_cmd
 
 - name: Save the OpenStack novarc credentials
   copy:
     dest: "{{ output_dir }}/novarc"
-    content: "{{ novarc_cmd }}/novarc"
+    content: "{{ novarc_cmd.stdout }}"
