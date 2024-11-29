@@ -1,15 +1,3 @@
-- name: Deploy the VMs
-  terraform:
-    project_path: "{{ playbook_dir }}/terraform/maas-machines"
-    force_init: true
-    complex_vars: true
-    variables:
-      maas_api_url: "{{ maas_api_url }}"
-      maas_api_key: "{{ maas_api_key }}"
-      maas_vm_host_id: "{{ maas_vm_host_id }}"
-      machines: "{{ machines }}"
-      networks: "{{ networks }}"
-
 - name: Clone the stsstack-bundles repo
   git:
     repo: https://github.com/canonical/stsstack-bundles.git
@@ -35,8 +23,6 @@
         --num-compute {{ vm_count }} \
         --vip-addr-start {{ vip_addr_start }}
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
-  vars:
-    vip_addr_start: "{{ networks[0].reserved_ranges[0].start }}"
 
 - name: Amend the generated bundle
   shell:
@@ -47,7 +33,7 @@
 
 - name: Deploy the bundle
   shell:
-    cmd: source b/openstack/command
+    cmd: $(cat b/openstack/command) {{ extra_deploy_args }}
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
 

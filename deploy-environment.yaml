@@ -79,15 +79,26 @@
         juju_cloud: "{{ env_name }}"
         juju_channel: "2.9/stable"
 
-- name: Deploy OpenStack
+- name: Skip MAAS intro
   hosts: localhost
-  roles:
-    - role: ansible/roles/environments/openstack
-      vars:
-        maas_api_url: "{{ maas_url }}"
-        maas_api_key: "{{ maas_apikey }}"
-        maas_vm_host_id: "{{ vmhost.id }}"
-        machines: "{{ vms }}"
+  tasks:
+    - shell: maas {{ maas.user }} maas set-config name=completed_intro value=true
+
+
+- name: Deploy the VMs
+  hosts: localhost
+  tasks:
+    - name: Deploy the VMs
+      terraform:
+        project_path: "{{ playbook_dir }}/terraform/maas-machines"
+        force_init: true
+        complex_vars: true
+        variables:
+          maas_api_url: "{{ maas_url }}"
+          maas_api_key: "{{ maas_apikey }}"
+          maas_vm_host_id: "{{ vmhost.id }}"
+          machines: "{{ machines }}"
+          networks: "{{ networks }}"
 
 - name: Deploy Landscape
   hosts: localhost
@@ -98,3 +109,40 @@
         juju_cloud: "{{ env_name }}"
         admin_user: admin
         admin_password: password
+
+- name: Generate the landscape-client overlay for the OpenStack model
+  hosts: localhost
+  tasks:
+    - import_role:
+        name: ansible/roles/environments/landscape
+        tasks_from: landscape-client.yaml
+      vars:
+        juju_model: openstack
+        client_config:
+          account-name: standalone
+          url: "https://{{ landscape_api.ip }}/message-system"
+          ping-url: "http://{{ landscape_api.ip }}/ping"
+          ssl-public-key: "base64:{{ landscape_api.ssl_ca_cert | b64encode }}"
+        relate_to:
+          - cinder
+          - easyrsa
+          - etcd
+          - glance
+          - keystone
+          - memcached
+          - mysql
+          - neutron-api
+          - nova-cloud-controller
+          - nova-compute
+          - ovn-central
+          - placement
+          - rabbitmq-server
+          - vault
+
+- name: Deploy OpenStack
+  hosts: localhost
+  roles:
+    - role: ansible/roles/environments/openstack
+      vars:
+        vip_addr_start: "{{ networks[0].reserved_ranges[0].start }}"
+        extra_deploy_args: "--overlay {{ landscape_client_bundle.dest | realpath }}"

@@ -1,0 +1,26 @@
+- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
+
+- name: Generate the landscape-client bundle
+  block:
+    - set_fact:
+        relation: [landscape-client:container, "{{ item }}:juju-info"]
+      with_items: "{{ relate_to }}"
+      register: relation_items
+
+    - set_fact:
+        relations: "{{ relation_items.results | map(attribute='ansible_facts.relation') }}"
+
+    - set_fact:
+        bundle:
+          applications:
+            landscape-client:
+              charm: landscape-client
+              channel: "{{ charm_channel }}"
+              options: "{{ client_config }}"
+          relations: "{{ relations }}"
+
+- name: Write the landscape-client bundle to a file
+  copy:
+    dest: "{{ output_dir }}/landscape-client-bundle-{{ juju_model }}.yaml"
+    content: "{{ bundle | to_nice_yaml(indent=2) }}"
+  register: landscape_client_bundle

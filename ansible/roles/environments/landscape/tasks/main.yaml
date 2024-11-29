@@ -39,10 +39,40 @@
     JUJU_MODEL: "{{ juju_model }}"
 
 - name: Wait for Landscape to be ready
-  shell: |
-    juju wait-for model {{ juju_model }}
+  shell:
+    cmd: |
+      while true; do
+        status=$(juju status --format json)
+        all_units=$(
+          echo "$status" |
+            jq -r --arg app {{ item }} '
+                .applications[$app].units | keys[]
+              ' |
+            wc -l
+        )
+        ready_units=$(
+          echo "$status" |
+            jq -r --arg app {{ item }} '
+                .applications[$app].units | to_entries[] |
+                  select(
+                    .value["workload-status"].current=="active" and
+                    .value["juju-status"].current == "idle"
+                  ) |
+                  .key
+              ' |
+            wc -l
+        )
+        if [[ "$all_units" == "$ready_units" ]]; then
+          break
+        fi
+        sleep 5
+      done
+    executable: /bin/bash
   environment:
     JUJU_MODEL: "{{ juju_model }}"
+  with_items:
+    - haproxy
+    - landscape-server
 
 - name: Find the HAProxy and PostgreSQL IPs
   shell: |
@@ -100,9 +130,11 @@
 
 - set_fact:
     landscape_api:
+      ip: "{{ ips.haproxy_ip }}"
       uri: "{{ haproxy_url }}"
       key: "{{ landscape_api_credentials.access_key_id }}"
       secret: "{{ landscape_api_credentials.access_secret_key }}"
+      ssl_ca_cert: "{{ certificate.certificate }}"
       ssl_ca_file: "{{ certificate.filename }}"
 
 - name: Generate Landscape environment variables

@@ -1,1 +1,2 @@
 juju_model: landscape
+charm_channel: latest/stable
