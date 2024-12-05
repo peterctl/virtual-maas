@@ -6,10 +6,18 @@
     return_content: true
   register: privatekey
 
+- name: Create certificate signing request
+  community.crypto.openssl_csr:
+    path: "{{ output_dir }}/landscape.csr"
+    privatekey_path: "{{ privatekey.filename }}"
+    common_name: "{{ landscape_api_fqdn }}"
+  register: csr
+
 - name: Create certificate
   community.crypto.x509_certificate:
     path: "{{ output_dir }}/landscape.crt"
     privatekey_path: "{{ privatekey.filename }}"
+    csr_path: "{{ csr.filename }}"
     provider: selfsigned
     return_content: true
   register: certificate
@@ -98,15 +106,56 @@
     ips: "{{ ips_cmd.stdout | from_json }}"
     operator_pass: "{{ operator_pass_cmd.stdout }}"
 
+- name: Get or create the Landscape API DNS record
+  shell:
+    cmd: |
+      get_dnsrecord=$(
+        maas {{ maas_user }} dnsresources read |
+          jq -r --arg fqdn {{ landscape_api_fqdn }} '.[] | select(.fqdn==$fqdn)'
+      )
+      if [[ "$get_dnsrecord" == "" ]]; then
+        maas {{ maas_user }} dnsresources create \
+          fqdn={{ landscape_api_fqdn }} \
+          ip_addresses={{ ips.haproxy_ip }}
+        retval=$?
+        echo changed=true >&2
+        exit $retval
+      else
+        has_correct_ip=$(
+          echo "$get_dnsrecord" |
+            jq -r --arg ip_address {{ ips.haproxy_ip }} '
+                .ip_addresses[].ip | contains($ip_address)
+              '
+        )
+        if $has_correct_ip; then
+          echo "$get_dnsrecord"
+          echo changed=false >&2
+          exit 0
+        else
+          dnsrecord_id=$(echo "get_dnsrecord" | jq -r .id)
+          maas {{ maas_user }} dnsresource update $dnsrecord_id \
+            fqdn={{ landscape_api_fqdn }} \
+            ip_addresses={{ ips.haproxy_ip }}
+          retval=$?
+          echo changed=true >&2
+          exit $retval
+        fi
+      fi
+    executable: /bin/bash
+  register: dnsrecord
+  changed_when: dnsrecord.stderr == "changed=true" and dnsrecord.rc == 0
+  failed_when: dnsrecord.rc != 0
+
 - set_fact:
-    haproxy_url: "https://{{ ips.haproxy_ip }}"
+    haproxy_url_dns: "https://{{ landscape_api_fqdn }}"
+    haproxy_url_ip: "https://{{ ips.haproxy_ip }}"
     psql_uri: "postgresql://operator:{{ operator_pass }}@{{ ips.psql_ip }}:5432"
 
 - name: Bootstrap the Landscape account
   shell: |
     juju exec --unit landscape-server/leader -- \
       sudo /opt/canonical/landscape/bootstrap-account \
-        --root_url https://{{ ips.haproxy_ip }}/ \
+        --root_url {{ haproxy_url_ip }} \
         --admin_name {{ admin_user }} \
         --admin_email {{ admin_user }}@landscape \
         --admin_password {{ admin_password }}
@@ -131,7 +180,9 @@
 - set_fact:
     landscape_api:
       ip: "{{ ips.haproxy_ip }}"
-      uri: "{{ haproxy_url }}"
+      fqdn: "{{ landscape_api_fqdn }}"
+      url_ip: "{{ haproxy_url_ip }}"
+      url_fqdn: "{{ haproxy_url_dns }}"
       key: "{{ landscape_api_credentials.access_key_id }}"
       secret: "{{ landscape_api_credentials.access_secret_key }}"
       ssl_ca_cert: "{{ certificate.certificate }}"
@@ -141,7 +192,7 @@
   copy:
     dest: "{{ output_dir }}/landscaperc"
     content: |
-      export LANDSCAPE_API_URI="{{ landscape_api.uri }}"
+      export LANDSCAPE_API_URI="{{ landscape_api.url_ip }}"
       export LANDSCAPE_API_KEY="{{ landscape_api.key }}"
       export LANDSCAPE_API_SECRET="{{ landscape_api.secret }}"
       export LANDSCAPE_API_SSL_CA_FILE="{{ landscape_api.ssl_ca_file }}"

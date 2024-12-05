@@ -109,6 +109,7 @@
         juju_cloud: "{{ env_name }}"
         admin_user: admin
         admin_password: password
+        maas_user: "{{ maas.user }}"
 
 - name: Generate the landscape-client overlay for the OpenStack model
   hosts: localhost
@@ -120,8 +121,8 @@
         juju_model: openstack
         client_config:
           account-name: standalone
-          url: "https://{{ landscape_api.ip }}/message-system"
-          ping-url: "http://{{ landscape_api.ip }}/ping"
+          url: "https://{{ landscape_api.fqdn }}/message-system"
+          ping-url: "http://{{ landscape_api.fqdn }}/ping"
           ssl-public-key: "base64:{{ landscape_api.ssl_ca_cert | b64encode }}"
         relate_to:
           - cinder

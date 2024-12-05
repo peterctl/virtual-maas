@@ -9,6 +9,7 @@
 
     - set_fact:
         relations: "{{ relation_items.results | map(attribute='ansible_facts.relation') }}"
+        options: "{{ client_config | combine({'registration-key': registration_key}) }}"
 
     - set_fact:
         bundle:
@@ -16,7 +17,7 @@
             landscape-client:
               charm: landscape-client
               channel: "{{ charm_channel }}"
-              options: "{{ client_config }}"
+              options: "{{ options }}"
           relations: "{{ relations }}"
 
 - name: Write the landscape-client bundle to a file

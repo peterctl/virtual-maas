@@ -1,2 +1,4 @@
 juju_model: landscape
 charm_channel: latest/stable
+landscape_api_fqdn: landscape-api.maas
+registration_key: welcome
