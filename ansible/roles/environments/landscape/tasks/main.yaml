@@ -155,10 +155,11 @@
   shell: |
     juju exec --unit landscape-server/leader -- \
       sudo /opt/canonical/landscape/bootstrap-account \
-        --root_url {{ haproxy_url_ip }} \
-        --admin_name {{ admin_user }} \
-        --admin_email {{ admin_user }}@landscape \
-        --admin_password {{ admin_password }}
+        --root_url "{{ haproxy_url_ip }}" \
+        --admin_name "{{ admin_user }}" \
+        --admin_email "{{ admin_user }}@landscape" \
+        --admin_password "{{ admin_password }}" \
+        --registration_key "{{ registration_key }}"
   environment:
     JUJU_MODEL: "{{ juju_model }}"
   register: account_cmd
