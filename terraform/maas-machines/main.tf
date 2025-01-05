@@ -24,6 +24,7 @@ resource "maas_vm_host_machine" "machines" {
     for_each = { for i, disk in each.value.disks : i => disk }
     content {
       size_gigabytes = storage_disks.value.size_gb
+      pool = storage_disks.value.pool
     }
   }
 }

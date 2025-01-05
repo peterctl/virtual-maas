@@ -140,6 +140,10 @@
   with_items:
     - keystone
     - keystone-hacluster
+    - neutron-api
+    - neutron-api-hacluster
+    - nova-cloud-controller
+    - nova-cloud-controller-hacluster
 
 - name: Configure the deployed environment
   shell:
@@ -149,11 +153,18 @@
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
 
+- name: Grab the Vault root CA cert
+  shell:
+    cmd: |
+      juju run-action --wait vault/leader get-root-ca |
+        yq -r '.[].results.output' >{{ output_dir}}/vault-root-ca.crt
+
 - name: Collect the OpenStack novarc credentials
   shell:
     cmd: |
-      source novarc
+      source novarc >/dev/null
       env | grep '^OS_' | sed 's/^/export /'
+      echo OS_CACERT={{ output_dir }}/vault-root-ca.crt
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
   register: novarc_cmd

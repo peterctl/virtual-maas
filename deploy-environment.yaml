@@ -35,6 +35,11 @@
         maas_url: "{{hostvars[groups.hypervisor[0]]['maas_url']}}"
         maas_apikey: "{{hostvars[groups.hypervisor[0]]['maas_apikey']}}"
 
+- name: Skip MAAS intro
+  hosts: localhost
+  tasks:
+    - shell: maas {{ maas.user }} maas set-config name=completed_intro value=true
+
 - name: Register LXD VM host on MAAS
   hosts: hypervisor
   tasks:
@@ -49,7 +54,7 @@
 - name: Configure the networks in MAAS
   hosts: localhost
   tasks:
-    - name: "Configure network '{{ item.name }}' on MAAS"
+    - name: "Configure network on MAAS"
       include_role:
         name: ansible/roles/maas
         tasks_from: configure-network.yaml
@@ -78,12 +83,6 @@
         maas_url: "{{ maas_url }}"
         juju_cloud: "{{ env_name }}"
         juju_channel: "2.9/stable"
-
-- name: Skip MAAS intro
-  hosts: localhost
-  tasks:
-    - shell: maas {{ maas.user }} maas set-config name=completed_intro value=true
-
 
 - name: Deploy the VMs
   hosts: localhost

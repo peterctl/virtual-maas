@@ -17,7 +17,9 @@ machines:
       - data
     disks:
       - size_gb: 100  # Root disk
+        pool: data
       - size_gb: 20   # Ceph OSD
+        pool: data
     tags: [ openstack ]
   - name: openstack-2
     cores: 4
@@ -27,7 +29,9 @@ machines:
       - data
     disks:
       - size_gb: 100  # Root disk
+        pool: data
       - size_gb: 20   # Ceph OSD
+        pool: data
     tags: [ openstack ]
   - name: openstack-3
     cores: 4
@@ -37,7 +41,9 @@ machines:
       - data
     disks:
       - size_gb: 100  # Root disk
+        pool: data
       - size_gb: 20   # Ceph OSD
+        pool: data
     tags: [ openstack ]
 
   # For the Landscape model
@@ -48,6 +54,7 @@ machines:
       - mgmt
     disks:
       - size_gb: 100  # Root disk
+        pool: data
     tags: [ landscape ]
 
 # Virtual networks that will be created in the environment.
@@ -71,6 +78,15 @@ networks:
     dhcp:
       start: 10.2.0.100
       end: 10.2.0.149
+
+# LXD storage pools to store the VM disks.
+storage_pools:
+- name: default
+  driver: dir
+- name: data
+  driver: zfs
+  config:
+    source: data/lxd
 
 # Desired MAAS credentials.
 maas:
