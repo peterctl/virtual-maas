@@ -166,7 +166,7 @@
     cmd: |
       source novarc >/dev/null
       env | grep '^OS_' | sed 's/^/export /'
-      echo OS_CACERT={{ output_dir }}/vault-root-ca.crt
+      echo export OS_CACERT={{ output_dir }}/vault-root-ca.crt
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
   register: novarc_cmd
