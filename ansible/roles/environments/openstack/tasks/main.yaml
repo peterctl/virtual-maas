@@ -1,3 +1,5 @@
+- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
+
 - name: Clone the stsstack-bundles repo
   git:
     repo: https://github.com/canonical/stsstack-bundles.git
@@ -157,7 +159,7 @@
   shell:
     cmd: |
       juju run-action --wait vault/leader get-root-ca |
-        yq -r '.[].results.output' >{{ output_dir}}/vault-root-ca.crt
+        yq -r '.[].results.output' >{{ output_dir }}/vault-root-ca.crt
 
 - name: Collect the OpenStack novarc credentials
   shell:
