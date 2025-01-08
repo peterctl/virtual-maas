@@ -79,18 +79,20 @@ networks:
       start: 10.2.0.100
       end: 10.2.0.149
 
-# Upstream DNS to be configured in MAAS global settings.
-upstream_dns:
-  - 1.1.1.1
+# Upstream DNS to be configured in MAAS global settings. This can have different values:
+# - The "auto" string: This will use `resolvectl` to get the current DNS servers and use those in MAAS.
+# - A list of IPs: This will tell MAAS to use that list of IPs.
+# - Undefined / False: This will skip the upstream DNS configuration in MAAS.
+upstream_dns: auto
 
 # LXD storage pools to store the VM disks.
 storage_pools:
   - name: default
     driver: dir
   - name: data
-    driver: zfs
+    driver: dir
     config:
-      source: data/lxd
+      source: /data
 
 # Desired MAAS credentials.
 maas:

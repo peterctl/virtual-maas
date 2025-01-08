@@ -51,16 +51,29 @@
         maas_user: "{{ maas.user }}"
         lxd_address: "{{ maas_ip }}:8443"
 
-- name: Configure the networks in MAAS
+- name: Configure the DNS in MAAS
   hosts: localhost
   tasks:
+    - name: Grab the DNS from the running machine if needed
+      shell: |
+        resolvectl dns | awk -F': ' '$2!="" {print $2}'
+      register: resolvectl_out
+      when: upstream_dns is defined and upstream_dns == "auto"
+
+    - set_fact:
+        upstream_dns: "{{ resolvectl_out.stdout | split(' ') }}"
+      when: resolvectl_out is not skipped
+
     - name: Configure MAAS global upstream DNS
       shell: |
         maas {{ maas.user }} maas set-config \
           name=upstream_dns \
-          value="{{ upstream_dns | join(" ") }}"
-      when: upstream_dns is defined
+          value="{{ upstream_dns | join(' ') }}"
+      when: upstream_dns is defined and upstream_dns is not False
 
+- name: Configure the networks in MAAS
+  hosts: localhost
+  tasks:
     - name: "Configure network on MAAS"
       include_role:
         name: ansible/roles/maas

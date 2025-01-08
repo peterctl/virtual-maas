@@ -1,0 +1,105 @@
+# Name of the environment that will be deployed.
+env_name: vmaas
+
+# Ubuntu series used for the MAAS VMs.
+ubuntu_series:
+  - focal
+  - jammy
+
+# Virtual machines that will be created in the environment.
+machines:
+  # For the OpenStack model
+  - name: openstack-1
+    cores: 4
+    memory_mb: 16384
+    networks:
+      - mgmt
+      - data
+    disks:
+      - size_gb: 100 # Root disk
+        pool: data
+      - size_gb: 20 # Ceph OSD
+        pool: data
+    tags: [openstack]
+  - name: openstack-2
+    cores: 4
+    memory_mb: 16384
+    networks:
+      - mgmt
+      - data
+    disks:
+      - size_gb: 100 # Root disk
+        pool: data
+      - size_gb: 20 # Ceph OSD
+        pool: data
+    tags: [openstack]
+  - name: openstack-3
+    cores: 4
+    memory_mb: 16384
+    networks:
+      - mgmt
+      - data
+    disks:
+      - size_gb: 100 # Root disk
+        pool: data
+      - size_gb: 20 # Ceph OSD
+        pool: data
+    tags: [openstack]
+
+  # For the Landscape model
+  - name: landscape
+    cores: 2
+    memory_mb: 8192
+    networks:
+      - mgmt
+    disks:
+      - size_gb: 100 # Root disk
+        pool: data
+    tags: [landscape]
+
+# Virtual networks that will be created in the environment.
+networks:
+  - name: mgmt
+    cidr: 10.1.0.0/24
+    gateway_ip: 10.1.0.1
+    dhcp:
+      start: 10.1.0.100
+      end: 10.1.0.149
+    reserved_ranges:
+      # VIP addresses
+      - start: 10.1.0.150
+        end: 10.1.0.199
+      # OpenStack floating IPs
+      - start: 10.1.0.200
+        end: 10.1.0.254
+  - name: data
+    cidr: 10.2.0.0/24
+    gateway_ip: 10.2.0.1
+    dhcp:
+      start: 10.2.0.100
+      end: 10.2.0.149
+
+# Upstream DNS to be configured in MAAS global settings. This can have different values:
+# - The "auto" string: This will use `resolvectl` to get the current DNS servers and use those in MAAS.
+# - A list of IPs: This will tell MAAS to use that list of IPs.
+# - Undefined / False: This will skip the upstream DNS configuration in MAAS.
+upstream_dns: false
+
+# LXD storage pools to store the VM disks.
+storage_pools:
+  - name: default
+    driver: dir
+  - name: data
+    driver: zfs
+    config:
+      source: data/lxd
+
+# Desired MAAS credentials.
+maas:
+  user: admin
+  password: password
+
+# Juju options.
+juju:
+  channel: 2.9/stable
+  bootstrap_series: focal
