@@ -94,6 +94,12 @@
 - name: Deploy the VMs
   hosts: localhost
   tasks:
+    - name: Install the terraform snap
+      snap:
+        name: terraform
+        classic: true
+      become: true
+
     - name: Deploy the VMs
       terraform:
         project_path: "{{ playbook_dir }}/terraform/maas-machines"
