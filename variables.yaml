@@ -79,6 +79,9 @@ networks:
       start: 10.2.0.100
       end: 10.2.0.149
 
+# Upstream DNS to be configured in MAAS global settings.
+upstream_dns: 1.1.1.1
+
 # LXD storage pools to store the VM disks.
 storage_pools:
 - name: default

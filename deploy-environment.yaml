@@ -54,6 +54,13 @@
 - name: Configure the networks in MAAS
   hosts: localhost
   tasks:
+    - name: Configure MAAS global upstream DNS
+      shell: |
+        maas {{ maas.user }} maas set-config \
+          name=upstream_dns \
+          value="{{ upstream_dns | join(" ") }}"
+      when: upstream_dns is defined
+
     - name: "Configure network on MAAS"
       include_role:
         name: ansible/roles/maas

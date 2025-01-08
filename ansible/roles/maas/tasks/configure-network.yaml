@@ -31,6 +31,12 @@
       gateway_ip={{ network.gateway_ip }}
   when: network.gateway_ip != subnet.gateway_ip
 
+- name: Update subnet DNS servers
+  shell: |
+    maas {{ maas.user }} subnet update {{ subnet.id }} \
+      dns_servers="{{ network.dns_servers | join(",") }}"
+  when: network.dns_servers is defined and network.dns_servers != subnet.dns_servers
+
 - name: Get or create dynamic IP range for DHCP
   include_tasks:
     file: configure-ip-range.yaml
