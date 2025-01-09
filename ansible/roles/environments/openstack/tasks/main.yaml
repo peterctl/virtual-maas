@@ -11,6 +11,7 @@
       - python3-openstackclient
       - python3-keystoneclient
       - python3-neutronclient
+  become: true
 
 - name: Generate the OpenStack bundle
   shell:

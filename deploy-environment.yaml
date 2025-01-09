@@ -1,7 +1,10 @@
-- name: Create output directory on all hosts
+- name: Pre-requirements on all hosts
   hosts: all
   tasks:
     - import_tasks: ansible/tasks/output_dir.yaml
+    - snap:
+        name: yq
+      become: true
 
 - name: Install and configure LXD on the host.
   hosts: hypervisor

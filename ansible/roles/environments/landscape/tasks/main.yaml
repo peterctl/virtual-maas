@@ -170,7 +170,7 @@
 
 - name: Find the Landscape API key and secret
   shell:
-    python {{ playbook_dir }}/scripts/landscape_get_api_credentials.py {{ psql_uri }}
+    python3 {{ playbook_dir }}/scripts/landscape_get_api_credentials.py {{ psql_uri }}
   environment:
     JUJU_MODEL: "{{ juju_model }}"
   register: landscape_api_credentials_cmd
