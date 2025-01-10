@@ -1,6 +1,6 @@
 #!/bin/bash
 
-: ${DELETE_VOLUMES:="false"}
+DELETE_VOLUMES=${DELETE_VOLUMES:-false}
 
 read -r -d '' USERDATA <<EOF
 #cloud-config
@@ -20,6 +20,11 @@ fs_setup:
 mounts:
 - [ "/dev/vdb", "/data", "ext4", "defaults,nofail", "0", "2" ]
 
+swap:
+  filename: /data/swapfile
+  size: 10737418240
+  maxsize: 10737418240
+
 ssh_import_id: [${USER}]
 EOF
 
@@ -27,14 +32,23 @@ vm_name=${USER}-virtual-maas
 
 case "$1" in
 create)
+  image=$(
+    openstack image list -f value -c Name |
+      grep auto-sync/ubuntu | grep amd64 | grep noble | head -n1
+  )
+
   server_create=$(
-    openstack server create $vm_name --wait -f json \
-      --image auto-sync/ubuntu-noble-24.04-amd64-server-20241119-disk1.img \
-      --network net_stg-reproducer-${USER}-psd \
+    openstack server create "$vm_name" --wait -f json \
+      --image "$image" \
+      --network "net_stg-reproducer-${USER}-psd" \
       --flavor staging-cpu48-ram64-disk100 \
       --user-data <(echo "$USERDATA") \
       --block-device device_name=data,destination_type=volume,device_type=disk,volume_size=500
   )
+  exitcode=$?
+  if [[ $exitcode != 0 ]]; then
+    exit $exitcode
+  fi
 
   server_id=$(echo "$server_create" | jq -r '.id')
   ip_addr=$(echo "$server_create" | jq -r '.addresses[][]')
@@ -44,16 +58,16 @@ create)
   echo "    ssh ubuntu@$ip_addr"
   ;;
 delete)
-  server_json=$(openstack server show $vm_name -f json)
+  server_json=$(openstack server show "$vm_name" -f json)
   server_id=$(echo "$server_json" | jq -r '.id')
   server_volumes=$(echo "$server_json" | jq -r '.volumes_attached[].id')
 
-  openstack server delete $server_id
+  openstack server delete "$server_id"
 
   echo "VM $vm_name ($server_id) has been deleted."
   if [[ "$DELETE_VOLUMES" == "true" ]]; then
     for volume in $server_volumes; do
-      openstack volume delete $volume
+      openstack volume delete "$volume"
       echo "Deleted attached volume $volume"
     done
   else
@@ -64,12 +78,12 @@ delete)
   fi
   ;;
 "show-ip")
-  server_json=$(openstack server show $vm_name -f json)
+  server_json=$(openstack server show "$vm_name" -f json)
   ip_addr=$(echo "$server_json" | jq -r '.addresses[][]')
-  echo $ip_addr
+  echo "$ip_addr"
   ;;
 *)
-  echo "usage: $0 (up|down|show-ip)"
+  echo "usage: $0 (create|delete|show-ip)"
   exit 1
   ;;
 esac

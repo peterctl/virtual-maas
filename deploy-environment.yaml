@@ -57,22 +57,36 @@
 - name: Configure the DNS in MAAS
   hosts: localhost
   tasks:
+    - set_fact:
+        upstream_dns: "{{ upstream_dns | default(false) }}"
+
     - name: Grab the DNS from the running machine if needed
       shell: |
         resolvectl dns | awk -F': ' '$2!="" {print $2}'
       register: resolvectl_out
-      when: upstream_dns is defined and upstream_dns == "auto"
+      when: upstream_dns == "auto"
 
     - set_fact:
-        upstream_dns: "{{ resolvectl_out.stdout | split(' ') }}"
-      when: resolvectl_out is not skipped
+        should_apply_upstream_dns: true
+        upstream_dns_value: "{{ resolvectl_out.stdout }}"
+      when: upstream_dns == "auto"
+
+    - set_fact:
+        should_apply_upstream_dns: true
+        upstream_dns_value: "{{ upstream_dns | join(' ') }}"
+      when: upstream_dns is not false and upstream_dns != "auto"
+
+    - set_fact:
+        should_apply_upstream_dns: false
+        upstream_dns_value: ""
+      when: upstream_dns is false
 
     - name: Configure MAAS global upstream DNS
       shell: |
         maas {{ maas.user }} maas set-config \
           name=upstream_dns \
-          value="{{ upstream_dns | join(' ') }}"
-      when: upstream_dns is defined and upstream_dns is not False
+          value="{{ upstream_dns_value }}"
+      when: should_apply_upstream_dns
 
 - name: Configure the networks in MAAS
   hosts: localhost
