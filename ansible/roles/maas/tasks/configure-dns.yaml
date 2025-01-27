@@ -1,0 +1,42 @@
+- set_fact:
+    upstream_dns: "{{ upstream_dns | default(false) }}"
+    localhost_dns: 127.0.0.53
+
+- name: Grab the DNS from the running machine if needed
+  shell: |
+    resolvectl dns | awk -F': ' '$2!="" {print $2}'
+  register: resolvectl_out
+  when: upstream_dns == "auto"
+
+- set_fact:
+    should_apply_upstream_dns: true
+    upstream_dns_value: "{{ upstream_dns | join(' ') }}"
+  when: upstream_dns is not false and upstream_dns != "auto"
+
+- set_fact:
+    should_apply_upstream_dns: "{{ localhost_dns in resolvectl_out.stdout }}"
+    upstream_dns_value: "{{ resolvectl_out.stdout }}"
+  when: upstream_dns == "auto"
+
+- set_fact:
+    should_apply_upstream_dns: false
+    upstream_dns_value: ""
+  when: upstream_dns is false
+
+- name: Configure MAAS global upstream DNS
+  shell: |
+    maas {{ maas.user }} maas set-config \
+      name=upstream_dns \
+      value="{{ upstream_dns_value }}"
+  when: should_apply_upstream_dns
+
+- name: Use MAAS as the localhost DNS resolver
+  become: true
+  community.general.ini_file:
+    path: /etc/systemd/resolved.conf
+    section: Resolve
+    option: DNS
+    value: "{{ localhost_dns }}"
+    mode: '0644'
+    no_extra_spaces: true
+  when: upstream_dns is not false

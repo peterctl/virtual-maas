@@ -96,15 +96,14 @@
 
 - name: Find the PostgreSQL operator password
   shell: |
-    juju run-action --wait postgresql/leader get-password username=operator |
-      yq -r '.[].results.password'
+    bash {{ playbook_dir }}/scripts/postgresql-get-uri.sh operator
   environment:
     JUJU_MODEL: "{{ juju_model }}"
-  register: operator_pass_cmd
+  register: psql_uri_cmd
 
 - set_fact:
     ips: "{{ ips_cmd.stdout | from_json }}"
-    operator_pass: "{{ operator_pass_cmd.stdout }}"
+    psql_uri: "{{ psql_uri_cmd.stdout }}"
 
 - name: Get or create the Landscape API DNS record
   shell:
@@ -149,7 +148,7 @@
 - set_fact:
     haproxy_url_dns: "https://{{ landscape_api_fqdn }}"
     haproxy_url_ip: "https://{{ ips.haproxy_ip }}"
-    psql_uri: "postgresql://operator:{{ operator_pass }}@{{ ips.psql_ip }}:5432"
+    bootstrap_error: "Account 'standalone' already exists"
 
 - name: Bootstrap the Landscape account
   shell: |
@@ -164,12 +163,12 @@
     JUJU_MODEL: "{{ juju_model }}"
   register: account_cmd
   changed_when: |
-    "Account 'standalone' already exists" not in account_cmd.stderr and account_cmd.rc == 0
+     bootstrap_error not in (account_cmd.stderr + account_cmd.stdout) and account_cmd.rc == 0
   failed_when: |
-    "Account 'standalone' already exists" not in account_cmd.stderr and account_cmd.rc != 0
+     bootstrap_error not in (account_cmd.stderr + account_cmd.stdout) and account_cmd.rc != 0
 
 - name: Find the Landscape API key and secret
-  shell:
+  shell: |
     python3 {{ playbook_dir }}/scripts/landscape_get_api_credentials.py {{ psql_uri }}
   environment:
     JUJU_MODEL: "{{ juju_model }}"
@@ -193,7 +192,7 @@
   copy:
     dest: "{{ output_dir }}/landscaperc"
     content: |
-      export LANDSCAPE_API_URI="{{ landscape_api.url_ip }}"
+      export LANDSCAPE_API_URI="{{ landscape_api.url_fqdn }}"
       export LANDSCAPE_API_KEY="{{ landscape_api.key }}"
       export LANDSCAPE_API_SECRET="{{ landscape_api.secret }}"
       export LANDSCAPE_API_SSL_CA_FILE="{{ landscape_api.ssl_ca_file }}"

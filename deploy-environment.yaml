@@ -57,36 +57,9 @@
 - name: Configure the DNS in MAAS
   hosts: localhost
   tasks:
-    - set_fact:
-        upstream_dns: "{{ upstream_dns | default(false) }}"
-
-    - name: Grab the DNS from the running machine if needed
-      shell: |
-        resolvectl dns | awk -F': ' '$2!="" {print $2}'
-      register: resolvectl_out
-      when: upstream_dns == "auto"
-
-    - set_fact:
-        should_apply_upstream_dns: true
-        upstream_dns_value: "{{ resolvectl_out.stdout }}"
-      when: upstream_dns == "auto"
-
-    - set_fact:
-        should_apply_upstream_dns: true
-        upstream_dns_value: "{{ upstream_dns | join(' ') }}"
-      when: upstream_dns is not false and upstream_dns != "auto"
-
-    - set_fact:
-        should_apply_upstream_dns: false
-        upstream_dns_value: ""
-      when: upstream_dns is false
-
-    - name: Configure MAAS global upstream DNS
-      shell: |
-        maas {{ maas.user }} maas set-config \
-          name=upstream_dns \
-          value="{{ upstream_dns_value }}"
-      when: should_apply_upstream_dns
+    - import_role:
+        name: ansible/roles/maas
+        tasks_from: configure-dns.yaml
 
 - name: Configure the networks in MAAS
   hosts: localhost
@@ -119,7 +92,8 @@
         maas_apikey: "{{ maas_apikey }}"
         maas_url: "{{ maas_url }}"
         juju_cloud: "{{ env_name }}"
-        juju_channel: "2.9/stable"
+        juju_channel: "{{ juju.channel }}"
+        bootstrap_series: "{{ juju.bootstrap_series }}"
 
 - name: Deploy the VMs
   hosts: localhost

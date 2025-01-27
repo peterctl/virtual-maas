@@ -159,8 +159,7 @@
 - name: Grab the Vault root CA cert
   shell:
     cmd: |
-      juju run-action --wait vault/leader get-root-ca |
-        yq -r '.[].results.output' >{{ output_dir }}/vault-root-ca.crt
+      bash {{ playbook_dir }}/scripts/vault-get-root-ca.sh >{{ output_dir }}/vault-root-ca.crt
 
 - name: Collect the OpenStack novarc credentials
   shell:
