@@ -3,7 +3,6 @@ env_name: vmaas
 
 # Ubuntu series used for the MAAS VMs.
 ubuntu_series:
-  - focal
   - jammy
 
 # Virtual machines that will be created in the environment.
@@ -12,6 +11,7 @@ machines:
   - name: openstack-1
     cores: 4
     memory_mb: 16384
+    zone: az1
     networks:
       - mgmt
       - data
@@ -24,6 +24,7 @@ machines:
   - name: openstack-2
     cores: 4
     memory_mb: 16384
+    zone: az2
     networks:
       - mgmt
       - data
@@ -36,6 +37,7 @@ machines:
   - name: openstack-3
     cores: 4
     memory_mb: 16384
+    zone: az3
     networks:
       - mgmt
       - data
@@ -101,5 +103,5 @@ maas:
 
 # Juju options.
 juju:
-  channel: 2.9/stable
-  bootstrap_series: focal
+  channel: 3.6/stable
+  bootstrap_series: jammy

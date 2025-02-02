@@ -16,6 +16,7 @@ variable "machines" {
     cores     = number
     memory_mb = number
     networks  = list(string)
+    zone      = optional(string)
     tags      = optional(list(string))
     disks = optional(list(object({
       size_gb = number

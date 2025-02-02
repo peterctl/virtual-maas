@@ -1,6 +1,15 @@
 locals {
-  machine_map = { for machine in var.machines : machine.name => machine }
+  machine_map   = { for machine in var.machines : machine.name => machine }
   network_cidrs = { for network in var.networks : network.name => network.cidr }
+  zones         = toset([for machine in var.machines : machine.zone if machine.zone != null])
+}
+
+# TODO: this currently depends on a fork of terraform-provider-maas.
+#   https://github.com/peterctl/terraform-provider-maas
+resource "maas_zone" "zones" {
+  for_each = local.zones
+
+  name = each.value
 }
 
 resource "maas_vm_host_machine" "machines" {
@@ -11,6 +20,7 @@ resource "maas_vm_host_machine" "machines" {
   hostname = each.key
   cores    = each.value.cores
   memory   = each.value.memory_mb
+  zone     = each.value.zone
 
   dynamic "network_interfaces" {
     for_each = toset(each.value.networks)
@@ -24,13 +34,15 @@ resource "maas_vm_host_machine" "machines" {
     for_each = { for i, disk in each.value.disks : i => disk }
     content {
       size_gigabytes = storage_disks.value.size_gb
-      pool = storage_disks.value.pool
+      pool           = storage_disks.value.pool
     }
   }
+
+  depends_on = [maas_zone.zones]
 }
 
 locals {
-  all_tags     = distinct(flatten([for machine in var.machines : machine.tags]))
+  all_tags = distinct(flatten([for machine in var.machines : machine.tags]))
   tag_map = zipmap(
     local.all_tags,
     [
