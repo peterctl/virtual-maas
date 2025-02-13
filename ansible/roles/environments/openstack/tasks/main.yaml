@@ -20,11 +20,14 @@
         --name openstack \
         --default-binding mgmt \
         --model-constraints tags=openstack \
+        --ceph \
         --hyperconverged \
         --ha \
         --vault-ha \
+        --rabbitmq-server-ha \
         --num-compute {{ vm_count }} \
-        --vip-addr-start {{ vip_addr_start }}
+        --vip-addr-start {{ vip_addr_start }} \
+        {{ extra_openstack_bundle_args }}
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
 
 - name: Amend the generated bundle
@@ -32,7 +35,17 @@
     cmd: |
       # Remove the `storage` definition under nova-compute.
       yq -i 'del(.applications[].storage)' b/openstack/openstack.yaml
+      # Enable HA for ceph-mon and set the osd-devices config.
+      yq -i '
+          .applications["ceph-mon"].to = ["lxd:0", "lxd:1", "lxd:2"]
+        ' b/openstack/unit-placement.yaml
+      yq -i '
+          .applications["ceph-mon"].num_units = 3 |
+          .applications["ceph-mon"].options["monitor-count"] = 3 |
+          .applications["ceph-osd"].options["osd-devices"] = env(OSD_DEVICES)
+        ' b/openstack/o/ceph/ceph.yaml
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
+  environment: "{{ openstack_configure_env }}"
 
 - name: Deploy the bundle
   shell:
@@ -155,6 +168,7 @@
       ./configure metal
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
+  environment: "{{ openstack_configure_env }}"
 
 - name: Grab the Vault root CA cert
   shell:

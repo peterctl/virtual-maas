@@ -18,7 +18,7 @@ machines:
     disks:
       - size_gb: 100 # Root disk
         pool: data
-      - size_gb: 20 # Ceph OSD
+      - size_gb: 200 # Ceph OSD
         pool: data
     tags: [openstack]
   - name: openstack-2
@@ -31,7 +31,7 @@ machines:
     disks:
       - size_gb: 100 # Root disk
         pool: data
-      - size_gb: 20 # Ceph OSD
+      - size_gb: 200 # Ceph OSD
         pool: data
     tags: [openstack]
   - name: openstack-3
@@ -44,7 +44,7 @@ machines:
     disks:
       - size_gb: 100 # Root disk
         pool: data
-      - size_gb: 20 # Ceph OSD
+      - size_gb: 200 # Ceph OSD
         pool: data
     tags: [openstack]
 
@@ -62,24 +62,24 @@ machines:
 # Virtual networks that will be created in the environment.
 networks:
   - name: mgmt
-    cidr: 10.1.0.0/24
-    gateway_ip: 10.1.0.1
+    cidr: 10.10.0.0/24
+    gateway_ip: 10.10.0.1
     dhcp:
-      start: 10.1.0.100
-      end: 10.1.0.149
+      start: 10.10.0.100
+      end: 10.10.0.149
     reserved_ranges:
       # VIP addresses
-      - start: 10.1.0.150
-        end: 10.1.0.199
+      - start: 10.10.0.150
+        end: 10.10.0.199
       # OpenStack floating IPs
-      - start: 10.1.0.200
-        end: 10.1.0.254
+      - start: 10.10.0.200
+        end: 10.10.0.254
   - name: data
-    cidr: 10.2.0.0/24
-    gateway_ip: 10.2.0.1
+    cidr: 10.20.0.0/24
+    gateway_ip: 10.20.0.1
     dhcp:
-      start: 10.2.0.100
-      end: 10.2.0.149
+      start: 10.20.0.100
+      end: 10.20.0.149
 
 # Upstream DNS to be configured in MAAS global settings. This can have different values:
 # - The "auto" string: This will use `resolvectl` to get the current DNS servers and use those in MAAS.
@@ -105,3 +105,10 @@ maas:
 juju:
   channel: 3.6/stable
   bootstrap_series: jammy
+
+extra_openstack_bundle_args: "-s jammy -r yoga"
+openstack_configure_env:
+  GATEWAY: 10.10.0.1
+  CIDR_EXT: 10.10.0.0/24
+  FIP_RANGE: 10.10.0.200:10.10.0.254
+  OSD_DEVICES: /dev/sdb

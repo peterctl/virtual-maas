@@ -1,1 +1,3 @@
 vm_count: 3
+openstack_configure_env: {}
+extra_openstack_bundle_args: ""
