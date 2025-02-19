@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
+
 import argparse
 import json
 import subprocess
-import textwrap
 
 
 PSQL_LEADER = "postgresql/leader"

@@ -181,8 +181,8 @@
     landscape_api:
       ip: "{{ ips.haproxy_ip }}"
       fqdn: "{{ landscape_api_fqdn }}"
-      url_ip: "{{ haproxy_url_ip }}"
-      url_fqdn: "{{ haproxy_url_dns }}"
+      url_ip: "{{ haproxy_url_ip }}/api"
+      url_fqdn: "{{ haproxy_url_dns }}/api"
       key: "{{ landscape_api_credentials.access_key_id }}"
       secret: "{{ landscape_api_credentials.access_secret_key }}"
       ssl_ca_cert: "{{ certificate.certificate }}"
