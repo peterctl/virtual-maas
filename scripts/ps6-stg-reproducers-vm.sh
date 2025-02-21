@@ -22,8 +22,8 @@ mounts:
 
 swap:
   filename: /data/swapfile
-  size: 10737418240
-  maxsize: 10737418240
+  size: 17179869184     # 16*(1024**3): 16GB as bytes
+  maxsize: 17179869184  # 16*(1024**3): 16GB as bytes
 
 ssh_import_id: [${USER}]
 EOF

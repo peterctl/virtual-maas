@@ -20,6 +20,7 @@ machines:
         pool: data
       - size_gb: 20 # Ceph OSD
         pool: data
+    zone: az1
     tags: [openstack]
   - name: openstack-2
     cores: 4
@@ -32,6 +33,7 @@ machines:
         pool: data
       - size_gb: 20 # Ceph OSD
         pool: data
+    zone: az2
     tags: [openstack]
   - name: openstack-3
     cores: 4
@@ -44,6 +46,7 @@ machines:
         pool: data
       - size_gb: 20 # Ceph OSD
         pool: data
+    zone: az3
     tags: [openstack]
 
   # For the Landscape model
@@ -103,3 +106,7 @@ maas:
 juju:
   channel: 2.9/stable
   bootstrap_series: focal
+
+extra_openstack_bundle_args: "-s focal -r ussuri"
+openstack_configure_env:
+  OSD_DEVICES: /dev/sdb
