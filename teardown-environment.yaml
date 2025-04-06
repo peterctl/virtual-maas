@@ -1,0 +1,35 @@
+- name: Teardown the environment
+  hosts: localhost
+  tasks:
+    - import_tasks: ansible/tasks/output_dir.yaml
+
+    - name: Destroy Juju resources
+      shell: |
+        juju destroy-model --force --no-wait --no-prompt openstack
+        juju destroy-model --force --no-wait --no-prompt landscape
+        juju destroy-controller --force --no-wait --no-prompt {{ env_name }}
+      failed_when: false # Continue if it fails
+
+    - name: Teardown the VMs
+      terraform:
+        project_path: "{{ playbook_dir }}/terraform/maas-machines"
+        state: absent
+        force_init: true
+        complex_vars: true
+        variables: "{{ lookup('file', output_dir + '/maas-machines.tfvars.json') | from_json }}"
+
+    - name: Teardown LXD networks and data pool
+      terraform:
+        project_path: "{{ playbook_dir }}/terraform/lxd-data-pool-and-networks"
+        state: absent
+        force_init: true
+        complex_vars: true
+        variables: "{{ lookup('file', output_dir + '/lxd-resources.tfvars.json') | from_json }}"
+
+    - name: Remove MAAS snaps
+      snap:
+        name:
+          - maas
+          - maas-test-db
+        state: absent
+      become: true
