@@ -1,30 +1,3 @@
-- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
-
-- set_fact:
-    net_item:
-      name: "{{ item.name }}"
-      config:
-        ipv4.address: "{{ item.gateway_ip }}/{{ item.cidr | ansible.utils.ipaddr('prefix') }}"
-        ipv4.dhcp: false
-        ipv4.nat: true
-        ipv6.address: none
-        ipv6.dhcp: false
-        ipv6.nat: true
-        dns.mode: none
-  with_items: "{{ networks }}"
-  register: net_items
-
-- set_fact:
-    rendered_networks: "{{ net_items.results | map(attribute='ansible_facts.net_item') }}"
-
-- set_fact:
-    preseed_yaml:
-      config:
-        core.https_address: "[::]:8443"
-        core.trust_password: "{{ trust_password }}"
-      storage_pools: "{{ storage_pools }}"
-      networks: "{{ rendered_networks }}"
-
 - name: Enable IPv4 forwarding.
   sysctl:
     name: net.ipv4.ip_forward
@@ -37,19 +10,13 @@
   snap:
     name: lxd
 
-- name: Render the preseed template.
-  copy:
-    dest: "{{ output_dir }}/lxd-preseed.yaml"
-    content: "{{ preseed_yaml | to_nice_yaml(indent=2) }}"
-  register: preseed
-
-# - name: Render the preseed template.
-#   template:
-#     dest: "{{ output_dir }}/lxd-preseed.yaml"
-#     src: "templates/preseed.yaml"
-#   register: preseed
-
-- name: Init LXD.
+- name: Init LXD
   shell:
     cmd: |
-      lxd init --preseed < {{ preseed.dest }}
+      lxd init --auto
+
+- name: Configure LXD access
+  shell:
+    cmd: |
+      lxc config set core.https_address "[::]:8443"
+      lxc config set core.trust_password "{{ trust_password }}"

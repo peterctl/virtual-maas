@@ -5,15 +5,26 @@
     - snap:
         name: yq
       become: true
+    - apt:
+        name: jq
+      become: true
 
 - name: Install and configure LXD on the host.
-  hosts: hypervisor
+  hosts: localhost
   become: true
-  roles:
-    - role: ansible/roles/lxd
+  tasks:
+    - import_role:
+        name: ansible/roles/lxd
+
+- name: Configure the LXD networks and storage pool.
+  hosts: localhost
+  tasks:
+    - import_role:
+        name: ansible/roles/lxd
+        tasks_from: terraform-resources.yaml
 
 - name: Deploy MAAS server
-  hosts: hypervisor
+  hosts: localhost
   become: true
   roles:
     - role: ansible/roles/maas
@@ -24,19 +35,12 @@
 - name: Add MAAS client to localhost
   hosts: localhost
   tasks:
-    - name: Install MAAS snap
-      snap:
-        name: maas
-      become: true
-
     - name: Login to MAAS
       import_role:
         name: ansible/roles/maas
         tasks_from: login.yaml
       vars:
         maas_user: "{{ maas.user }}"
-        maas_url: "{{hostvars[groups.hypervisor[0]]['maas_url']}}"
-        maas_apikey: "{{hostvars[groups.hypervisor[0]]['maas_apikey']}}"
 
 - name: Skip MAAS intro
   hosts: localhost
@@ -44,7 +48,7 @@
     - shell: maas {{ maas.user }} maas set-config name=completed_intro value=true
 
 - name: Register LXD VM host on MAAS
-  hosts: hypervisor
+  hosts: localhost
   tasks:
     - import_role:
         name: ansible/roles/maas
@@ -98,23 +102,9 @@
 - name: Deploy the VMs
   hosts: localhost
   tasks:
-    - name: Install the terraform snap
-      snap:
-        name: terraform
-        classic: true
-      become: true
-
-    - name: Deploy the VMs
-      terraform:
-        project_path: "{{ playbook_dir }}/terraform/maas-machines"
-        force_init: true
-        complex_vars: true
-        variables:
-          maas_api_url: "{{ maas_url }}"
-          maas_api_key: "{{ maas_apikey }}"
-          maas_vm_host_id: "{{ vmhost.id }}"
-          machines: "{{ machines }}"
-          networks: "{{ networks }}"
+    - import_role:
+        name: ansible/roles/maas
+        tasks_from: terraform-machines.yaml
 
 - name: Deploy Landscape
   hosts: localhost

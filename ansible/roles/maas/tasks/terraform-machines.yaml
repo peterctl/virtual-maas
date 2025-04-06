@@ -1,0 +1,28 @@
+- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
+
+- name: Install the terraform snap
+  snap:
+    name: terraform
+    classic: true
+  become: true
+
+- name: Collect variables for Terraform
+  set_fact:
+    variables:
+      maas_api_url: "{{ maas_url }}"
+      maas_api_key: "{{ maas_apikey }}"
+      maas_vm_host_id: "{{ vmhost.id }}"
+      machines: "{{ machines }}"
+      networks: "{{ networks }}"
+
+- name: Save Terraform variables to the output dir
+  copy:
+    dest: "{{ output_dir }}/maas-machines.tfvars.json"
+    content: "{{ variables | to_nice_json }}"
+
+- name: Deploy the VMs
+  terraform:
+    project_path: "{{ playbook_dir }}/terraform/maas-machines"
+    force_init: true
+    complex_vars: true
+    variables: "{{ variables }}"

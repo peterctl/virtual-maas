@@ -88,14 +88,10 @@ networks:
 # - Undefined / False: This will skip the upstream DNS configuration in MAAS.
 upstream_dns: auto
 
-# LXD storage pools to store the VM disks.
-storage_pools:
-  - name: default
-    driver: dir
-  - name: data
-    driver: dir
-    config:
-      source: /data
+# LXD data storage pool to store the VM disks.
+lxd_data_pool:
+  driver: dir
+  source: /data
 
 # Desired MAAS credentials.
 maas:

@@ -1,0 +1,25 @@
+- import_tasks: "{{ playbook_dir }}/ansible/tasks/output_dir.yaml"
+
+- name: Install the terraform snap
+  snap:
+    name: terraform
+    classic: true
+  become: true
+
+- name: Collect variables for Terraform
+  set_fact:
+    variables:
+      data_pool: "{{ lxd_data_pool }}"
+      networks: "{{ networks }}"
+
+- name: Save Terraform variables to the output dir
+  copy:
+    dest: "{{ output_dir }}/lxd-resources.tfvars.json"
+    content: "{{ variables | to_nice_json }}"
+
+- name: Configure the required LXD networks and data pool
+  terraform:
+    project_path: "{{ playbook_dir }}/terraform/lxd-data-pool-and-networks"
+    force_init: true
+    complex_vars: true
+    variables: "{{ variables }}"
