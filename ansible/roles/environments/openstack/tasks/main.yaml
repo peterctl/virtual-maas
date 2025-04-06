@@ -55,63 +55,7 @@
 
 - name: Wait for Vault to be ready to initialize
   shell:
-    cmd: |
-      while true; do
-        status=$(juju status --format json)
-        all_units=$(
-          echo "$status" |
-            jq -r '.applications.vault.units | keys[]' |
-            wc -l
-        )
-        blocked_units=$(
-          echo "$status" |
-            jq -r '
-                .applications.vault.units | to_entries[] |
-                  select(
-                    .value["workload-status"].current == "blocked" and
-                    .value["workload-status"].message == "Vault needs to be initialized" and
-                    .value["juju-status"].current == "idle"
-                  ) |
-                  .key
-              ' |
-            wc -l
-        )
-        if [[ "$all_units" == "$blocked_units" ]]; then
-          echo ready_to_init
-          break
-        fi
-        ready_units=$(
-          echo "$status" |
-            jq -r '
-                .applications.vault.units | to_entries[] |
-                  select(
-                    .value["workload-status"].current == "active" and
-                    (.value["workload-status"].message | startswith("Unit is ready")) and
-                    .value["juju-status"].current == "idle"
-                  ) |
-                  .key
-              ' |
-            wc -l
-        )
-        sealed_units=$(
-          echo "$status" |
-            jq -r '
-                .applications.vault.units | to_entries[] |
-                  select(
-                    .value["workload-status"].current == "blocked" and
-                    .value["workload-status"].message == "Unit is sealed" and
-                    .value["juju-status"].current == "idle"
-                  ) |
-                  .key
-              ' |
-            wc -l
-        )
-        if [[ "$all_units" == "$(($ready_units + $sealed_units))" ]]; then
-          echo skip_init
-          break
-        fi
-        sleep 5
-      done
+    cmd: "{{ playbook_dir }}/scripts/vault-wait-ready.sh"
     executable: /bin/bash
   register: vault_waitready
 
@@ -124,33 +68,7 @@
 
 - name: Wait for the OpenStack API to be ready
   shell:
-    cmd: |
-      while true; do
-        status=$(juju status --format json)
-        all_units=$(
-          echo "$status" |
-            jq -r --arg app {{ item }} '
-                .applications[$app].units | keys[]
-              ' |
-            wc -l
-        )
-        ready_units=$(
-          echo "$status" |
-            jq -r --arg app {{ item }} '
-                .applications[$app].units | to_entries[] |
-                  select(
-                    .value["workload-status"].current=="active" and
-                    .value["juju-status"].current == "idle"
-                  ) |
-                  .key
-              ' |
-            wc -l
-        )
-        if [[ "$all_units" == "$ready_units" ]]; then
-          break
-        fi
-        sleep 5
-      done
+    cmd: "{{ playbook_dir }}/scripts/openstack-api-wait-ready.sh {{ item }}"
     chdir: "{{ output_dir }}/stsstack-bundles/openstack"
     executable: /bin/bash
   with_items:
