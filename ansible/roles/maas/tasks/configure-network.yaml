@@ -1,8 +1,3 @@
-- name: Install jq
-  become: true
-  apt:
-    name: jq
-
 - name: Get primary rack
   shell: maas {{ maas.user }} rack-controllers read | jq -r '.[0]'
   register: primary_rack_cmd
@@ -46,10 +41,6 @@
     iprange_start: "{{ network.dhcp.start }}"
     iprange_end: "{{ network.dhcp.end }}"
   when: network.dhcp is defined and network.dhcp not in [false, none]
-
-- name: DEBUG item
-  debug:
-    var: item
 
 - name: Get or create reserved IP ranges
   include_tasks:
