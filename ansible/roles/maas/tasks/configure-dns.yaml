@@ -30,13 +30,24 @@
       value="{{ upstream_dns_value }}"
   when: should_apply_upstream_dns
 
-# - name: Use MAAS as the localhost DNS resolver
-#   become: true
-#   community.general.ini_file:
-#     path: /etc/systemd/resolved.conf
-#     section: Resolve
-#     option: DNS
-#     value: "{{ localhost_dns }}"
-#     mode: '0644'
-#     no_extra_spaces: true
-#   when: upstream_dns is not false
+- name: Use MAAS as the localhost DNS resolver
+  become: true
+  when: upstream_dns is not false
+  block:
+    - name: resolvectl DNS config
+      community.general.ini_file:
+        path: /etc/systemd/resolved.conf
+        section: Resolve
+        option: DNS
+        value: "{{ localhost_dns }}"
+        mode: '0644'
+        no_extra_spaces: true
+
+    - name: resolvectl Domain config
+      community.general.ini_file:
+        path: /etc/systemd/resolved.conf
+        section: Resolve
+        option: Domains
+        value: ~maas
+        mode: '0644'
+        no_extra_spaces: true
